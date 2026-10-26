@@ -19,6 +19,10 @@ namespace IncrementalFramework
         private readonly Dictionary<string, int> upgrades;
         private readonly Dictionary<string, int> flags;
         private readonly Dictionary<string, int> modifiers;
+        private readonly Dictionary<string, int> resourceCategories;
+        private readonly Dictionary<string, int> producerCategories;
+        private readonly int[] resourceCategoryIndices;
+        private readonly int[] producerCategoryIndices;
         private readonly IReadOnlyList<IndexedModifier> indexedModifiers;
         private readonly IReadOnlyList<int>[] modifierProducers;
         private readonly IReadOnlyList<int>[] resourceRules;
@@ -53,6 +57,10 @@ namespace IncrementalFramework
             Flags = Number.Copy(flags); this.flags = Index(Flags, x => x.Id);
             this.resources = Index(Resources, x => x.Id); this.producers = Index(Producers, x => x.Id);
             this.upgrades = Index(Upgrades, x => x.Id); Index(Rules, x => x.Id);
+            resourceCategories = CategoryIndex(Resources, x => x.Category);
+            producerCategories = CategoryIndex(Producers, x => x.Category);
+            resourceCategoryIndices = CompileCategoryIndices(Resources, x => x.Category, resourceCategories);
+            producerCategoryIndices = CompileCategoryIndices(Producers, x => x.Category, producerCategories);
             var modifierDefinitions = new List<ModifierDefinition>(modifiers ?? Array.Empty<ModifierDefinition>());
             var dynamicDefinitions = new Dictionary<string, ModifierDefinition>(StringComparer.Ordinal);
             foreach (var modifier in modifierDefinitions)
@@ -128,9 +136,10 @@ namespace IncrementalFramework
                     }
                     else if (modifier.Target == ModifierTarget.ResourceCategoryProduction)
                     {
+                        target = Lookup(resourceCategories, modifier.TargetId);
                         bool found = false;
                         for (int r = 0; r < Resources.Count; r++)
-                            if (string.Equals(Resources[r].Category, modifier.TargetId, StringComparison.Ordinal))
+                            if (resourceCategoryIndices[r] == target)
                             {
                                 found = true; AddUnique(reverseResourceUpgrades[r], i);
                                 foreach (int p in reverseProducers[r]) { AddUnique(upgradeProducers[i], p); AddUnique(reverseUpgrades[p], i); }
@@ -139,9 +148,10 @@ namespace IncrementalFramework
                     }
                     else if (modifier.Target == ModifierTarget.ProducerCategoryProduction)
                     {
+                        target = Lookup(producerCategories, modifier.TargetId);
                         bool found = false;
                         for (int p = 0; p < Producers.Count; p++)
-                            if (string.Equals(Producers[p].Category, modifier.TargetId, StringComparison.Ordinal))
+                            if (producerCategoryIndices[p] == target)
                             { found = true; AddUnique(upgradeProducers[i], p); AddUnique(reverseUpgrades[p], i); }
                         if (!found) throw new ArgumentException("Unknown producer category: " + modifier.TargetId);
                     }
@@ -253,6 +263,8 @@ namespace IncrementalFramework
                 if (definition.Target == ModifierTarget.ProducerProduction) target = ProducerIndex(definition.TargetId);
                 else if (definition.Target == ModifierTarget.ResourceProduction || (definition.Target == ModifierTarget.Click && !string.IsNullOrEmpty(definition.TargetId)))
                     target = ResourceIndex(definition.TargetId);
+                else if (definition.Target == ModifierTarget.ResourceCategoryProduction) target = Lookup(resourceCategories, definition.TargetId);
+                else if (definition.Target == ModifierTarget.ProducerCategoryProduction) target = Lookup(producerCategories, definition.TargetId);
                 var modifier = new IndexedModifier(target, definition.Kind, definition.Value, definition.Target, definition.Id, definition.TargetId, definition.Priority);
                 compiledDynamic.Add(modifier);
                 for (int p = 0; p < Producers.Count; p++)
@@ -269,6 +281,8 @@ namespace IncrementalFramework
         public int UpgradeIndex(string id) => Lookup(upgrades, id);
         public int FlagIndex(string id) => Lookup(flags, id);
         public int ModifierIndex(string id) => Lookup(modifiers, id);
+        public int ResourceCategoryIndex(int resourceIndex) => resourceCategoryIndices[resourceIndex];
+        public int ProducerCategoryIndex(int producerIndex) => producerCategoryIndices[producerIndex];
         public IndexedModifier Modifier(int index) => indexedModifiers[index];
         public IReadOnlyList<int> ModifierAffectedProducers(int index) => modifierProducers[index];
         private bool Matches(IndexedModifier modifier, int producer, int resource)
@@ -278,8 +292,8 @@ namespace IncrementalFramework
                 case ModifierTarget.GlobalProduction: return true;
                 case ModifierTarget.ProducerProduction: return modifier.TargetIndex == producer;
                 case ModifierTarget.ResourceProduction: return modifier.TargetIndex == resource;
-                case ModifierTarget.ProducerCategoryProduction: return string.Equals(modifier.Category, Producers[producer].Category, StringComparison.Ordinal);
-                case ModifierTarget.ResourceCategoryProduction: return string.Equals(modifier.Category, Resources[resource].Category, StringComparison.Ordinal);
+                case ModifierTarget.ProducerCategoryProduction: return modifier.TargetIndex == producerCategoryIndices[producer];
+                case ModifierTarget.ResourceCategoryProduction: return modifier.TargetIndex == resourceCategoryIndices[resource];
                 default: return false;
             }
         }
@@ -375,6 +389,21 @@ namespace IncrementalFramework
                 index.Add(id(values[i]), i);
             }
             return index;
+        }
+        private static Dictionary<string, int> CategoryIndex<T>(IReadOnlyList<T> values, Func<T, string> category)
+        {
+            var names = new SortedSet<string>(StringComparer.Ordinal);
+            foreach (var value in values) if (!string.IsNullOrEmpty(category(value))) names.Add(category(value));
+            var result = new Dictionary<string, int>(StringComparer.Ordinal);
+            foreach (string name in names) result.Add(name, result.Count);
+            return result;
+        }
+        private static int[] CompileCategoryIndices<T>(IReadOnlyList<T> values, Func<T, string> category, Dictionary<string, int> indices)
+        {
+            var result = new int[values.Count];
+            for (int i = 0; i < result.Length; i++)
+                result[i] = !string.IsNullOrEmpty(category(values[i])) ? indices[category(values[i])] : -1;
+            return result;
         }
         private static List<int>[] Lists(int count)
         {

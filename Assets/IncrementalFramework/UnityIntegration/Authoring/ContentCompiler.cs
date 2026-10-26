@@ -456,7 +456,7 @@ namespace IdleHands.UnityIntegration
             {
                 string item = path + "[" + index + "]";
                 if (index < 0 || index >= nodes.Length) { errors.Add(item + " is out of range."); return; }
-                if (depth > 64) { errors.Add(item + " exceeds maximum expression depth 64."); return; }
+                if (depth > 63) { errors.Add(item + " exceeds maximum authored expression depth 63."); return; }
                 if (active.Contains(index)) { errors.Add(item + " creates a condition cycle."); return; }
                 if (!visited.Add(index)) { errors.Add(item + " is shared; each tree node must have one parent."); return; }
                 var node = nodes[index];

@@ -47,8 +47,8 @@ namespace IncrementalFramework
                 case ModifierTarget.GlobalProduction: return true;
                 case ModifierTarget.ProducerProduction: return modifier.TargetIndex == producer;
                 case ModifierTarget.ResourceProduction: return modifier.TargetIndex == resource;
-                case ModifierTarget.ProducerCategoryProduction: return string.Equals(modifier.Category, Content.Producers[producer].Category, StringComparison.Ordinal);
-                case ModifierTarget.ResourceCategoryProduction: return string.Equals(modifier.Category, Content.Resources[resource].Category, StringComparison.Ordinal);
+                case ModifierTarget.ProducerCategoryProduction: return modifier.TargetIndex == Content.ProducerCategoryIndex(producer);
+                case ModifierTarget.ResourceCategoryProduction: return modifier.TargetIndex == Content.ResourceCategoryIndex(resource);
                 default: return false;
             }
         }

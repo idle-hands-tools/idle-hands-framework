@@ -163,14 +163,15 @@ namespace IdleHands.UnityIntegration
                     !view.Purchased && allowed && Affordable(definition.Costs) && !Simulation.PendingTarget.HasValue);
             }
             var ruleStates = content.rules.Length == 0 ? null
-                : Simulation.ExportState().Rules.ToDictionary(x => x.Id, x => x.Fired);
+                : Simulation.ExportState().Rules.ToDictionary(x => x.Id);
             foreach (var rule in content.rules)
             {
                 var definition = compiled.Content.Rules.First(x => x.Id == rule.id);
+                var state = ruleStates[rule.id];
                 presenter.Rule(rule.id, (rule.triggerKind == RuleTriggerKind.Manual ? "TRIGGER / " : "")
-                    + (ruleStates[rule.id] ? "UNLOCKED  " : "LOCKED  ") + rule.displayName
+                    + (state.Disabled ? "DISABLED  " : state.Fired ? "UNLOCKED  " : "LOCKED  ") + rule.displayName
                     + "  |  " + DescribeCondition(definition.Condition),
-                    !Simulation.PendingTarget.HasValue && (!ruleStates[rule.id] || definition.Repeat)
+                    !state.Disabled && !Simulation.PendingTarget.HasValue && (!state.Fired || definition.Repeat)
                     && MeetsCondition(definition.Condition));
             }
             var prestige = compiled.Content.Prestige;

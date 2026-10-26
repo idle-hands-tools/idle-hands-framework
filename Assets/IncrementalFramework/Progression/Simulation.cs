@@ -59,6 +59,7 @@ namespace IncrementalFramework
             ruleArmed = new bool[ruleFired.Length];
             flags = new bool[content.Flags.Count];
             activeModifiers = new bool[content.Modifiers.Count];
+            InitializeJournalCapacity();
             for (int i = 0; i < flags.Length; i++) flags[i] = content.Flags[i].Initial;
             var resourceViews = new ResourceView[balances.Length];
             var producerViews = new ProducerView[owned.Length];

@@ -71,6 +71,13 @@ namespace IncrementalFramework
                 return lastChanges;
             }
         }
+        private void InitializeJournalCapacity()
+        {
+            int capacity = Math.Max(4, balances.Length + 8);
+            changeBefore.EnsureCapacity(capacity);
+            publishDeltas.Capacity = capacity;
+            scratchDeltas.Capacity = capacity;
+        }
 
         private SimulationChangeValue Capture(SimulationChangeKind kind, int index)
         {

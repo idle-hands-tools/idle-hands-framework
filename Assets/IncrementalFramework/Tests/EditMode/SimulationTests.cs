@@ -153,7 +153,11 @@ namespace IncrementalFrameworkTests
             var before = simulation.ExportState();
             var woodEvent = before.Events.Find(x => x.TargetId == "wood-rule");
             var goldEvent = before.Events.Find(x => x.TargetId == "gold-rule");
+            long goldRebuilds = simulation.RateRebuildCount("gold");
+            long woodRebuilds = simulation.RateRebuildCount("wood");
             Succeeds(simulation, new BuyUpgradeCommand("pick"));
+            Assert.That(simulation.RateRebuildCount("gold"), Is.EqualTo(goldRebuilds + 1));
+            Assert.That(simulation.RateRebuildCount("wood"), Is.EqualTo(woodRebuilds));
             var after = simulation.ExportState();
             Assert.That(after.Events.Find(x => x.TargetId == "wood-rule").Sequence, Is.EqualTo(woodEvent.Sequence),
                 "Unrelated rate dependencies must not be invalidated or rescheduled.");
