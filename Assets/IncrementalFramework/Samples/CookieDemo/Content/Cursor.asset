@@ -24,6 +24,8 @@ MonoBehaviour:
   - resource: {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
     amount: 1
   prerequisites: []
+  booleanNodes: []
+  rootConditionIndex: -1
   usePrestigePolicy: 0
   prestigePolicy: 0
   prestigeTransform: 1

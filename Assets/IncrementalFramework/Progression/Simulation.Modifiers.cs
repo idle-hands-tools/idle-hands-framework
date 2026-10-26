@@ -132,6 +132,8 @@ namespace IncrementalFramework
         private void CommitModifierChange(bool[] proposed, Dictionary<int, StatModifiers[]> outputs,
             SortedDictionary<int, StatModifiers> clicks, SortedSet<int> targets)
         {
+            for (int i = 0; i < proposed.Length; i++)
+                if (activeModifiers[i] != proposed[i]) Mark(SimulationChangeKind.Modifier, i);
             Array.Copy(proposed, activeModifiers, proposed.Length);
             foreach (var pair in outputs) outputModifiers[pair.Key] = pair.Value;
             foreach (var pair in clicks) clickModifiers[pair.Key] = pair.Value;

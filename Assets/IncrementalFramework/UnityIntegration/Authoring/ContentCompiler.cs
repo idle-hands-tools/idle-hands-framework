@@ -45,21 +45,24 @@ namespace IdleHands.UnityIntegration
                 x.id, ReadNumber(x.startingAmount), x.hasCap ? (BigDouble?)ReadNumber(x.cap) : null,
                 resetOnPrestige: x.resetOnPrestige, category: x.category,
                 prestigePolicy: x.usePrestigePolicy ? (ResetPolicy?)x.prestigePolicy : null,
-                prestigeTransform: ReadNumber(x.prestigeTransform))).ToArray();
+                prestigeTransform: ReadNumber(x.prestigeTransform), negativeAmountPolicy: x.negativePolicy)).ToArray();
             var producers = source.producers.Select(x => new ProducerDefinition(
                 x.id, Amounts(x.costs), Amounts(x.productionPerSecond),
                 double.Parse(x.costGrowth, CultureInfo.InvariantCulture), initiallyUnlocked: x.initiallyUnlocked,
                 prerequisites: Conditions(x.prerequisites), category: x.category,
                 prestigePolicy: x.usePrestigePolicy ? (ResetPolicy?)x.prestigePolicy : null,
-                prestigeTransform: ReadNumber(x.prestigeTransform))).ToArray();
+                prestigeTransform: ReadNumber(x.prestigeTransform),
+                prerequisiteCondition: OptionalBooleanTree(x.booleanNodes, x.rootConditionIndex))).ToArray();
             var upgrades = source.upgrades.Select(x => new UpgradeDefinition(
                 x.id, Amounts(x.costs), x.modifiers.Select((m, i) => CompileModifier(x.id, i, m)).ToArray(),
                 permanent: x.permanent, initiallyUnlocked: x.initiallyUnlocked,
-                prerequisites: Conditions(x.prerequisites))).ToArray();
+                prerequisites: Conditions(x.prerequisites),
+                prerequisiteCondition: OptionalBooleanTree(x.booleanNodes, x.rootConditionIndex))).ToArray();
             var rules = source.rules.Select(x => new RuleDefinition(
                 x.id, RuleConditions(x, source.clickResource), x.actions.Select(CompileAction).ToArray(),
                 repeat: x.repeat, cooldown: x.cooldownSeconds, resetOnPrestige: x.resetOnPrestige,
-                trigger: new RuleTriggerDefinition(x.triggerKind, x.triggerTargetId, x.triggerTime))).ToArray();
+                trigger: new RuleTriggerDefinition(x.triggerKind, x.triggerTargetId, x.triggerTime,
+                    x.filterScheduledEvent ? (ScheduledEventTriggerKind?)x.scheduledEventKind : null))).ToArray();
             PrestigeDefinition prestige = null;
             if (source.prestigeSourceResource != null)
             {
@@ -117,15 +120,19 @@ namespace IdleHands.UnityIntegration
                 int before = errors.Count;
                 CheckCategory(x.category, x.name + ".category", errors);
                 CheckResetPolicy(x.usePrestigePolicy, x.prestigePolicy, x.prestigeTransform, x.name, errors);
-                Parse(x.startingAmount, x.name + ".startingAmount", errors);
+                Parse(x.startingAmount, x.name + ".startingAmount", errors,
+                    allowNegative: x.negativePolicy != NegativeAmountPolicy.Reject);
                 if (x.hasCap)
                 {
                     Parse(x.cap, x.name + ".cap", errors);
-                    if (errors.Count == before && ReadNumber(x.startingAmount) > ReadNumber(x.cap))
-                        errors.Add(x.name + ".startingAmount exceeds its cap.");
+                    if (errors.Count == before)
+                    {
+                        var initial = ReadNumber(x.startingAmount);
+                        if (x.negativePolicy == NegativeAmountPolicy.ClampToZero) initial = BigDouble.Max(BigDouble.Zero, initial);
+                        if (initial > ReadNumber(x.cap)) errors.Add(x.name + ".startingAmount exceeds its cap.");
+                    }
                 }
-                if (x.negativePolicy != ResourceNegativePolicy.Reject)
-                    errors.Add(x.name + ".negativePolicy is unsupported by the current simulation; use Reject.");
+                if (!Enum.IsDefined(typeof(NegativeAmountPolicy), x.negativePolicy)) errors.Add(x.name + ".negativePolicy is invalid.");
                 if (!Enum.IsDefined(typeof(ResourceNumberFormat), x.numberFormat))
                     errors.Add(x.name + ".numberFormat is invalid.");
                 if (x.decimalPlaces < 0 || x.decimalPlaces > 12)
@@ -145,12 +152,14 @@ namespace IdleHands.UnityIntegration
                     || double.IsNaN(growth) || double.IsInfinity(growth) || growth < 1)
                     errors.Add(x.name + ".costGrowth must be a finite number >= 1.");
                 CheckConditions(x.prerequisites, resources, producers, upgrades, x.name + ".prerequisites", errors);
+                CheckBooleanTree(x.name, x.booleanNodes, x.rootConditionIndex, resources, producers, upgrades, flags, errors);
             }
             foreach (var x in source.upgrades ?? Array.Empty<UpgradeAsset>())
             {
                 if (x == null) continue;
                 CheckAmounts(x.costs, resources, x.name + ".costs", errors);
                 CheckConditions(x.prerequisites, resources, producers, upgrades, x.name + ".prerequisites", errors);
+                CheckBooleanTree(x.name, x.booleanNodes, x.rootConditionIndex, resources, producers, upgrades, flags, errors);
                 if (x.modifiers == null) { errors.Add(x.name + ".modifiers cannot be null."); continue; }
                 for (int i = 0; i < x.modifiers.Length; i++)
                     CheckModifier(x.modifiers[i], resources, producers, x.name + ".modifiers[" + i + "]", errors);
@@ -175,10 +184,13 @@ namespace IdleHands.UnityIntegration
             {
                 if (x == null) continue;
                 CheckTrigger(x, resources, producers, upgrades, flags, errors);
-                if (x.triggerResource != null) CheckResource(x.triggerResource, resources, x.name + ".triggerResource", errors);
-                Parse(x.threshold, x.name + ".threshold", errors);
+                if (x.useResourceThreshold)
+                {
+                    if (x.triggerResource != null) CheckResource(x.triggerResource, resources, x.name + ".triggerResource", errors);
+                    Parse(x.threshold, x.name + ".threshold", errors);
+                }
                 CheckConditions(x.conditions, resources, producers, upgrades, x.name + ".conditions", errors);
-                CheckBooleanTree(x, resources, producers, upgrades, flags, errors);
+                CheckBooleanTree(x.name, x.booleanNodes, x.rootConditionIndex, resources, producers, upgrades, flags, errors);
                 bool continuous = x.triggerKind == RuleTriggerKind.Automatic || x.triggerKind == RuleTriggerKind.ResourceThreshold
                     || x.triggerKind == RuleTriggerKind.Time;
                 if (float.IsNaN(x.cooldownSeconds) || float.IsInfinity(x.cooldownSeconds) || x.cooldownSeconds < 0
@@ -194,6 +206,7 @@ namespace IdleHands.UnityIntegration
                     if (action.kind == RuleActionKind.SetModifier)
                     {
                         exists = action.modifierId != null && dynamicModifierIds.Contains(action.modifierId);
+                        if (!string.IsNullOrEmpty(action.targetId)) errors.Add(path + ".targetId must be blank for SetModifier.");
                         if (action.defineModifier) CheckModifier(action.modifier, resources, producers, path + ".modifier", errors);
                     }
                     if (!string.IsNullOrEmpty(action.targetId))
@@ -259,7 +272,7 @@ namespace IdleHands.UnityIntegration
                     exists = !string.IsNullOrEmpty(modifier.targetId) && producers.Values.Any(x => x.category == modifier.targetId); break;
                 case AuthoredModifierScope.ResourceCategory:
                     exists = !string.IsNullOrEmpty(modifier.targetId) && resources.Values.Any(x => x.category == modifier.targetId); break;
-                case AuthoredModifierScope.Global: exists = true; break;
+                case AuthoredModifierScope.Global: exists = string.IsNullOrEmpty(modifier.targetId); break;
                 case AuthoredModifierScope.Click: exists = string.IsNullOrEmpty(modifier.targetId) || resources.ContainsKey(modifier.targetId); break;
                 default: exists = false; break;
             }
@@ -401,37 +414,40 @@ namespace IdleHands.UnityIntegration
 
         private static ConditionDefinition RuleConditions(RuleAsset rule, ResourceAsset defaultResource)
         {
-            var primary = new RequirementDefinition(IncrementalFramework.RequirementKind.Resource,
-                (rule.triggerResource != null ? rule.triggerResource : defaultResource).id, ReadNumber(rule.threshold));
-            var requirements = new[] { primary }.Concat(Conditions(rule.conditions))
-                .Select(ConditionDefinition.Require).ToList();
-            if (rule.rootConditionIndex >= 0) requirements.Add(CompileBooleanNode(rule, rule.rootConditionIndex));
+            var requirements = Conditions(rule.conditions).Select(ConditionDefinition.Require).ToList();
+            if (rule.useResourceThreshold)
+                requirements.Insert(0, ConditionDefinition.Require(new RequirementDefinition(IncrementalFramework.RequirementKind.Resource,
+                    (rule.triggerResource != null ? rule.triggerResource : defaultResource).id, ReadNumber(rule.threshold))));
+            if (rule.rootConditionIndex >= 0) requirements.Add(CompileBooleanNode(rule.booleanNodes, rule.rootConditionIndex));
             return ConditionDefinition.All(requirements.ToArray());
         }
 
-        private static ConditionDefinition CompileBooleanNode(RuleAsset rule, int index)
+        private static ConditionDefinition OptionalBooleanTree(ConditionNode[] nodes, int root)
+        { return root < 0 ? null : CompileBooleanNode(nodes, root); }
+
+        private static ConditionDefinition CompileBooleanNode(ConditionNode[] nodes, int index)
         {
-            var node = rule.booleanNodes[index];
+            var node = nodes[index];
             switch (node.operation)
             {
                 case ConditionOperator.Requirement:
                     return ConditionDefinition.Require(Conditions(new[] { node.requirement })[0]);
                 case ConditionOperator.Flag: return ConditionDefinition.Flag(node.flagId, node.expected);
-                case ConditionOperator.All: return ConditionDefinition.All(node.children.Select(i => CompileBooleanNode(rule, i)).ToArray());
-                case ConditionOperator.Any: return ConditionDefinition.Any(node.children.Select(i => CompileBooleanNode(rule, i)).ToArray());
-                case ConditionOperator.Not: return ConditionDefinition.Not(CompileBooleanNode(rule, node.children[0]));
+                case ConditionOperator.All: return ConditionDefinition.All(node.children.Select(i => CompileBooleanNode(nodes, i)).ToArray());
+                case ConditionOperator.Any: return ConditionDefinition.Any(node.children.Select(i => CompileBooleanNode(nodes, i)).ToArray());
+                case ConditionOperator.Not: return ConditionDefinition.Not(CompileBooleanNode(nodes, node.children[0]));
                 default: throw new ArgumentOutOfRangeException(nameof(node.operation));
             }
         }
 
-        private static void CheckBooleanTree(RuleAsset rule, Dictionary<string, ResourceAsset> resources,
+        private static void CheckBooleanTree(string owner, ConditionNode[] nodes, int root, Dictionary<string, ResourceAsset> resources,
             Dictionary<string, ProducerAsset> producers, Dictionary<string, UpgradeAsset> upgrades,
             Dictionary<string, FlagAsset> flags, List<string> errors)
         {
-            string path = rule.name + ".booleanNodes";
-            if (rule.booleanNodes == null) { errors.Add(path + " cannot be null."); return; }
-            if (rule.rootConditionIndex == -1 && rule.booleanNodes.Length == 0) return;
-            if (rule.booleanNodes.Length > 1024 || rule.rootConditionIndex < 0 || rule.rootConditionIndex >= rule.booleanNodes.Length)
+            string path = owner + ".booleanNodes";
+            if (nodes == null) { errors.Add(path + " cannot be null."); return; }
+            if (root == -1 && nodes.Length == 0) return;
+            if (nodes.Length > 1024 || root < 0 || root >= nodes.Length)
             { errors.Add(path + " requires a valid rootConditionIndex and at most 1024 nodes."); return; }
             var visited = new HashSet<int>();
             var active = new HashSet<int>();
@@ -439,11 +455,11 @@ namespace IdleHands.UnityIntegration
             visit = (index, depth) =>
             {
                 string item = path + "[" + index + "]";
-                if (index < 0 || index >= rule.booleanNodes.Length) { errors.Add(item + " is out of range."); return; }
+                if (index < 0 || index >= nodes.Length) { errors.Add(item + " is out of range."); return; }
                 if (depth > 64) { errors.Add(item + " exceeds maximum expression depth 64."); return; }
                 if (active.Contains(index)) { errors.Add(item + " creates a condition cycle."); return; }
                 if (!visited.Add(index)) { errors.Add(item + " is shared; each tree node must have one parent."); return; }
-                var node = rule.booleanNodes[index];
+                var node = nodes[index];
                 if (node == null) { errors.Add(item + " is missing."); return; }
                 if (node.children == null) { errors.Add(item + ".children cannot be null."); return; }
                 if (node.children.Length > 1024) { errors.Add(item + " has too many children."); return; }
@@ -462,8 +478,8 @@ namespace IdleHands.UnityIntegration
                 foreach (int child in node.children) visit(child, depth + 1);
                 active.Remove(index);
             };
-            visit(rule.rootConditionIndex, 0);
-            if (visited.Count != rule.booleanNodes.Length) errors.Add(path + " contains unreachable nodes; remove or connect them.");
+            visit(root, 0);
+            if (visited.Count != nodes.Length) errors.Add(path + " contains unreachable nodes; remove or connect them.");
         }
 
         private static void CheckTrigger(RuleAsset rule, Dictionary<string, ResourceAsset> resources,
@@ -471,6 +487,9 @@ namespace IdleHands.UnityIntegration
             Dictionary<string, FlagAsset> flags, List<string> errors)
         {
             if (!Enum.IsDefined(typeof(RuleTriggerKind), rule.triggerKind)) errors.Add(rule.name + ".triggerKind is invalid.");
+            if (rule.filterScheduledEvent && (rule.triggerKind != RuleTriggerKind.ScheduledEvent
+                || !Enum.IsDefined(typeof(ScheduledEventTriggerKind), rule.scheduledEventKind)))
+                errors.Add(rule.name + ".scheduledEventKind requires a valid ScheduledEvent trigger filter.");
             if (double.IsNaN(rule.triggerTime) || double.IsInfinity(rule.triggerTime) || rule.triggerTime < 0
                 || (rule.triggerKind != RuleTriggerKind.Time && rule.triggerTime != 0))
                 errors.Add(rule.name + ".triggerTime must be finite, non-negative, and zero for non-Time triggers.");
@@ -478,7 +497,8 @@ namespace IdleHands.UnityIntegration
             bool exists;
             switch (rule.triggerKind)
             {
-                case RuleTriggerKind.ResourceThreshold: exists = resources.ContainsKey(rule.triggerTargetId); break;
+                case RuleTriggerKind.ResourceThreshold:
+                case RuleTriggerKind.ResourceChanged: exists = resources.ContainsKey(rule.triggerTargetId); break;
                 case RuleTriggerKind.ProducerPurchased: exists = producers.ContainsKey(rule.triggerTargetId); break;
                 case RuleTriggerKind.UpgradePurchased: exists = upgrades.ContainsKey(rule.triggerTargetId); break;
                 case RuleTriggerKind.FlagChanged: exists = flags.ContainsKey(rule.triggerTargetId); break;

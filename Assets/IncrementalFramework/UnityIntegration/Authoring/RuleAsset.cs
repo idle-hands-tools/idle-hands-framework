@@ -10,10 +10,14 @@ namespace IdleHands.UnityIntegration
         public IncrementalFramework.RuleTriggerKind triggerKind;
         [Tooltip("Optional resource/producer/upgrade/flag ID for the corresponding trigger; blank matches any.")]
         public string triggerTargetId;
+        public bool filterScheduledEvent;
+        public IncrementalFramework.ScheduledEventTriggerKind scheduledEventKind = IncrementalFramework.ScheduledEventTriggerKind.GrantResource;
         [Tooltip("Absolute simulation time for Time triggers only.")]
         [Min(0)] public double triggerTime;
         [Tooltip("Optional primary resource threshold. Defaults to the click resource.")]
         public ResourceAsset triggerResource;
+        [Tooltip("Disable for event/flag-only conditions, especially rules matching negative balances.")]
+        public bool useResourceThreshold = true;
         public string threshold = "0";
         [Tooltip("All conditions must be satisfied to unlock this milestone.")]
         public Requirement[] conditions = new Requirement[0];

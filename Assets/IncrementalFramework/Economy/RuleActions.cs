@@ -3,17 +3,24 @@ using BreakInfinity;
 
 namespace IncrementalFramework
 {
-    public enum RuleTriggerKind { Automatic, Time, Manual, ResourceThreshold, ProducerPurchased, UpgradePurchased, FlagChanged, Prestige }
+    public enum RuleTriggerKind { Automatic, Time, Manual, ResourceThreshold, ProducerPurchased, UpgradePurchased, FlagChanged, Prestige, ResourceChanged, ScheduledEvent }
+    public enum ScheduledEventTriggerKind { GrantResource = 1, BuyProducer, BuyUpgrade, ToggleProducer, Prestige, Click, SetFlag, SetModifier, TriggerRule }
     public sealed class RuleTriggerDefinition
     {
         public RuleTriggerKind Kind { get; }
         public string TargetId { get; }
         public double Time { get; }
-        public RuleTriggerDefinition(RuleTriggerKind kind, string targetId = null, double time = 0)
+        public ScheduledEventTriggerKind? ScheduledEventKind { get; }
+        public RuleTriggerDefinition(RuleTriggerKind kind, string targetId = null, double time = 0,
+            ScheduledEventTriggerKind? scheduledEventKind = null)
         {
             if (!Enum.IsDefined(typeof(RuleTriggerKind), kind) || double.IsNaN(time) || double.IsInfinity(time) || time < 0)
                 throw new ArgumentOutOfRangeException(nameof(kind));
             Kind = kind; TargetId = targetId; Time = time;
+            if (scheduledEventKind.HasValue && (kind != RuleTriggerKind.ScheduledEvent ||
+                !Enum.IsDefined(typeof(ScheduledEventTriggerKind), scheduledEventKind.Value)))
+                throw new ArgumentOutOfRangeException(nameof(scheduledEventKind));
+            ScheduledEventKind = scheduledEventKind;
         }
     }
     public sealed class SpendResourceAction : RuleAction
@@ -37,7 +44,8 @@ namespace IncrementalFramework
         public int Priority { get; }
         public ScheduleGrantResourceAction(string resourceId, BigDouble amount, double delay, int priority = 0)
         {
-            ResourceId = Number.Id(resourceId); Number.NonNegative(amount, nameof(amount));
+            ResourceId = Number.Id(resourceId);
+            if (!Number.IsFinite(amount)) throw new ArgumentOutOfRangeException(nameof(amount));
             if (double.IsNaN(delay) || double.IsInfinity(delay) || delay < 0) throw new ArgumentOutOfRangeException(nameof(delay));
             Amount = amount; Delay = delay; Priority = priority;
         }

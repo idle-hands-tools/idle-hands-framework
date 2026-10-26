@@ -47,6 +47,8 @@ namespace IncrementalFramework
             private readonly long expectedVersion;
             public object Store => store;
             public int Index => index;
+            public object Before => store.values[index];
+            public object After => value;
             public Write(DenseStateStore<T> store, int index, T value, long version)
             { this.store = store; this.index = index; this.value = value; expectedVersion = version; }
             public bool Validate() => store.version == expectedVersion;
@@ -58,8 +60,20 @@ namespace IncrementalFramework
     {
         object Store { get; }
         int Index { get; }
+        object Before { get; }
+        object After { get; }
         bool Validate();
         void Apply();
+    }
+
+    public readonly struct StateValueChange
+    {
+        public object Store { get; }
+        public int Index { get; }
+        public object Before { get; }
+        public object After { get; }
+        internal StateValueChange(object store, int index, object before, object after)
+        { Store = store; Index = index; Before = before; After = after; }
     }
 
     /// <summary>Stages module value writes; validation never mutates a store.</summary>
@@ -67,6 +81,8 @@ namespace IncrementalFramework
     {
         private readonly List<IStateWrite> writes = new List<IStateWrite>();
         private bool committed;
+        private readonly List<StateValueChange> changes = new List<StateValueChange>();
+        public IReadOnlyList<StateValueChange> Changes => changes.AsReadOnly();
         public void Set<T>(DenseStateStore<T> store, int index, T value) where T : struct
         {
             if (committed) throw new InvalidOperationException("Transaction is already committed.");
@@ -87,7 +103,13 @@ namespace IncrementalFramework
         {
             if (!Validate()) return false;
             // No user callbacks occur between validation and these nonthrowing indexed writes.
-            for (int i = 0; i < writes.Count; i++) writes[i].Apply();
+            for (int i = 0; i < writes.Count; i++)
+            {
+                var write = writes[i];
+                object before = write.Before, after = write.After;
+                if (!Equals(before, after)) changes.Add(new StateValueChange(write.Store, write.Index, before, after));
+                write.Apply();
+            }
             committed = true;
             return true;
         }

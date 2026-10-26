@@ -157,7 +157,9 @@ namespace IncrementalFrameworkTests
             var after = simulation.ExportState();
             Assert.That(after.Events.Find(x => x.TargetId == "wood-rule").Sequence, Is.EqualTo(woodEvent.Sequence),
                 "Unrelated rate dependencies must not be invalidated or rescheduled.");
+            Assert.That(after.Events.Find(x => x.TargetId == "wood-rule").TokenVersion, Is.EqualTo(woodEvent.TokenVersion));
             Assert.That(after.Events.Find(x => x.TargetId == "wood-rule").Time, Is.EqualTo(woodEvent.Time));
+            Assert.That(after.Events.Find(x => x.TargetId == "gold-rule").TokenVersion, Is.GreaterThan(goldEvent.TokenVersion));
             Assert.That(after.Events.Find(x => x.TargetId == "gold-rule").Time, Is.LessThan(goldEvent.Time));
             Assert.That(simulation.GetResource("gold").Rate.ToDouble(), Is.EqualTo(6));
             Assert.That(simulation.GetResource("wood").Rate.ToDouble(), Is.EqualTo(7));
@@ -245,6 +247,33 @@ namespace IncrementalFrameworkTests
         }
 
         [Test]
+        public void CancelledTombstonePruningConsumesWorkBudgetWithoutExecutingOrIntegratingTwice()
+        {
+            var simulation = new Simulation(WorkerContent(), eventBudget: 3);
+            Succeeds(simulation, new BuyProducerCommand("worker"));
+            for (int i = 1; i <= 10; i++)
+            {
+                var token = simulation.Schedule(new GrantResourceCommand("gold", 999), i);
+                Assert.That(simulation.Cancel(token), Is.True);
+            }
+            simulation.Schedule(new GrantResourceCommand("gold", 1), 20);
+            var result = simulation.AdvanceTo(30);
+            Assert.That(result.Completed, Is.False);
+            Assert.That(result.ProcessedEvents, Is.Zero);
+            Assert.That(result.ProcessedWork, Is.EqualTo(3));
+            Assert.That(simulation.Time, Is.Zero);
+            Balance(simulation, "gold", 0);
+            for (int i = 0; i < 5 && !result.Completed; i++)
+            {
+                result = simulation.AdvanceTo(30);
+                Assert.That(result.ProcessedWork, Is.LessThanOrEqualTo(3));
+            }
+            Assert.That(result.Completed, Is.True);
+            Balance(simulation, "gold", 31);
+            Assert.That(simulation.PendingEventCount, Is.Zero);
+        }
+
+        [Test]
         public void SameTimeZeroCooldownCascadeIsBoundedByEventBudget()
         {
             var content = new ContentDatabase(new[] { new ResourceDefinition("gold") }, rules:
@@ -268,6 +297,30 @@ namespace IncrementalFrameworkTests
             Assert.That(simulation.Cancel(token), Is.False);
             Assert.That(simulation.AdvanceTo(20).ProcessedEvents, Is.Zero);
             Balance(simulation, "gold", 0);
+        }
+
+        [Test]
+        public void SimulationCommandRescheduleInvalidatesOldTokenAndExecutesReplacementOnlyOnce()
+        {
+            var simulation = new Simulation(WorkerContent());
+            var original = simulation.Schedule(new GrantResourceCommand("gold", 7), 10);
+            var replacement = simulation.Reschedule(original, 20, -1);
+            Assert.That(replacement.Value, Is.EqualTo(original.Value));
+            Assert.That(replacement.Version, Is.EqualTo(original.Version + 1));
+            Assert.That(simulation.Cancel(original), Is.False);
+            Assert.Throws<ArgumentException>(() => simulation.Reschedule(original, 15));
+            Assert.That(simulation.AdvanceTo(10).ProcessedEvents, Is.Zero);
+            Balance(simulation, "gold", 0);
+            Assert.That(simulation.AdvanceTo(20).ProcessedEvents, Is.EqualTo(1));
+            Balance(simulation, "gold", 7);
+            Assert.That(simulation.AdvanceTo(30).ProcessedEvents, Is.Zero);
+            Balance(simulation, "gold", 7);
+            var cancelled = simulation.Schedule(new GrantResourceCommand("gold", 99), 40);
+            var current = simulation.Reschedule(cancelled, 50);
+            Assert.That(simulation.Cancel(cancelled), Is.False);
+            Assert.That(simulation.Cancel(current), Is.True);
+            simulation.AdvanceTo(60);
+            Balance(simulation, "gold", 7);
         }
 
         [Test]

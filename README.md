@@ -184,17 +184,20 @@ geometric prices, modifiers/invalidation, stable ordering/cancellation, caps,
 the explicit t=100 rate-change case, cascades, prestige/reset participation,
 seeded replay, migrations/backups, and analytical 24-hour catch-up.
 Runtime assemblies have built independently with C# 9/.NET Standard 2.1.
+The completed headless contract suite passed **200 tests** with no failures.
 **Unity Editor import and PlayMode tests have not been run:** no Editor is
 installed in the implementation sandbox. Use the Unity Test Runner before shipping.
 
 Measured reference run (2026-10-26): Ubuntu 24.04.5, .NET **8.0.31**, Intel Xeon
 Platinum 8573C, four available logical processors. For **10,000 owned producers,
 100 resources, 30 days**, three warmups and seven measured repetitions:
-advance min/median/mean/max **0.019933 / 0.021132 / 0.024383 / 0.036507 ms**,
-**0 allocated bytes** during advancement and **0 scheduled events**.
+advance min/median/mean/max **0.065376 / 0.088335 / 0.089017 / 0.126184 ms**,
+**64,320 allocated bytes** during advancement and **0 scheduled events**.
 All final balances and owned counts were checked. Compilation, fixture creation,
 and purchases are excluded from advancement timing and reported separately by the
 harness. These are measured cached-independent-production results on a virtual
 runner, not invented desktop numbers or a prediction for event-heavy games.
+The current immutable change journal allocates per changed advancement interval;
+the benchmark includes that cost. It is not a zero-allocation runtime.
 The initial under-100-ms catch-up goal is a profiling target, not a cross-machine
 guarantee. Re-run the harness on your target hardware and Unity runtime.

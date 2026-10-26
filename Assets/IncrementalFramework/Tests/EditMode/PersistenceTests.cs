@@ -207,6 +207,33 @@ namespace IncrementalFrameworkTests
             Assert.That(restored.PendingEventCount, Is.EqualTo(1));
         }
 
+        [Test]
+        public void SnapshotPreservesRescheduledRuleTokenVersionAndExcludesCancelledEntries()
+        {
+            var content = new ContentDatabase(new[] { new ResourceDefinition("gold"), new ResourceDefinition("gems") },
+                new[] { new ProducerDefinition("worker", null, new[] { new ResourceAmount("gold", 1) }) },
+                new[] { new UpgradeDefinition("upgrade", null, new[] { new ModifierDefinition("m", "worker", 2) }) },
+                new[] { new RuleDefinition("rule", "gold", 100, new RuleAction[] { new GrantResourceAction("gems", 5) }) });
+            var original = new Simulation(content);
+            original.Execute(new BuyProducerCommand("worker"));
+            original.Schedule(new BuyUpgradeCommand("upgrade"), 5);
+            var cancelled = original.Schedule(new GrantResourceCommand("gems", 999), 3);
+            original.Cancel(cancelled);
+            original.AdvanceTo(10);
+            var state = original.ExportState();
+            Assert.That(state.Events.Count, Is.EqualTo(1));
+            Assert.That(state.Events[0].Kind, Is.EqualTo(SimulationEventKind.Rule));
+            Assert.That(state.Events[0].TokenVersion, Is.GreaterThan(1));
+            var json = StateJson(original);
+            var restored = SnapshotService.Restore(content, SnapshotService.Deserialize(json));
+            Assert.That(StateJson(restored), Is.EqualTo(json));
+            original.AdvanceTo(100);
+            restored.AdvanceTo(100);
+            Assert.That(StateJson(restored), Is.EqualTo(StateJson(original)));
+            Assert.That(restored.GetResource("gold").Balance.ToDouble(), Is.EqualTo(195));
+            Assert.That(restored.GetResource("gems").Balance.ToDouble(), Is.EqualTo(5));
+        }
+
         [TestCase(1e20)]
         [TestCase(double.MaxValue)]
         public void PositiveCooldownAtHugeTimeNeverAccidentallyRepeatsAtSameTimestamp(double time)
@@ -291,6 +318,35 @@ namespace IncrementalFrameworkTests
             root[property] = property == "contentHash" ? new string('0', 64) : "different-version";
             Assert.Throws<JsonSerializationException>(() => SnapshotService.Deserialize(
                 root.ToString(), new[] { new VersionTwoSnapshotMigration(content) }));
+        }
+
+        [Test]
+        public void HistoricalDebtMigrationPreservesHugeSignedBalancesAndQueuedGrantsWithZeroLifetime()
+        {
+            var balance = BigDouble.FromMantissaExponentNoNormalize(-1.2345678901234567, 1000);
+            var amount = BigDouble.FromMantissaExponentNoNormalize(-2.345678901234567, 1001);
+            var content = new ContentDatabase(new[] {
+                new ResourceDefinition("debt", balance, negativeAmountPolicy: NegativeAmountPolicy.Allow) });
+            var original = new Simulation(content);
+            original.Schedule(new GrantResourceCommand("debt", amount), 5);
+            var root = JObject.Parse(StateJson(original));
+            root["version"] = 2;
+            root.Remove("contentHash");
+            root.Remove("contentVersion");
+            ((JObject)root["state"]["resources"][0]).Remove("lifetimeEarned");
+            var migrated = SnapshotService.Deserialize(root.ToString(), new[] { new VersionTwoSnapshotMigration(content) });
+            var restored = SnapshotService.Restore(content, migrated);
+            Assert.That(restored.GetResource("debt").Balance.Mantissa, Is.EqualTo(balance.Mantissa));
+            Assert.That(restored.GetResource("debt").Balance.Exponent, Is.EqualTo(balance.Exponent));
+            Assert.That(restored.GetResource("debt").LifetimeEarned, Is.EqualTo(BigDouble.Zero));
+            var queued = restored.ExportState().Events[0].Amount;
+            Assert.That(queued.Mantissa, Is.EqualTo(amount.Mantissa));
+            Assert.That(queued.Exponent, Is.EqualTo(amount.Exponent));
+            Assert.That(StateJson(restored), Is.EqualTo(StateJson(original)));
+            original.AdvanceTo(5);
+            restored.AdvanceTo(5);
+            Assert.That(StateJson(restored), Is.EqualTo(StateJson(original)));
+            Assert.That(restored.GetResource("debt").LifetimeEarned, Is.EqualTo(BigDouble.Zero));
         }
 
         [Test]

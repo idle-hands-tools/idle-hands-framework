@@ -86,12 +86,12 @@ namespace IncrementalFramework
             {
                 if (resource == null) throw new ArgumentException("Null resource state.");
                 int i = Content.ResourceIndex(resource.Id);
-                Number.NonNegative(resource.Balance, "balance");
+                BigDouble balance = NormalizeBalance(i, resource.Balance);
                 Number.NonNegative(resource.LifetimeEarned, "lifetime earned");
                 if (!seen.Add(i) || (Content.Resources[i].Cap.HasValue && resource.Balance > Content.Resources[i].Cap.Value))
                     throw new ArgumentException("Duplicate or out-of-range resource state.");
-                balances[i] = resource.Balance;
-                if (resource.LifetimeEarned < resource.Balance) throw new ArgumentException("Lifetime earned is below balance.");
+                balances[i] = balance;
+                if (resource.LifetimeEarned < balance) throw new ArgumentException("Lifetime earned is below balance.");
                 lifetime[i] = resource.LifetimeEarned;
             }
             seen.Clear();
@@ -143,7 +143,8 @@ namespace IncrementalFramework
             foreach (var entry in state.Events)
             {
                 if (entry == null || !Finite(entry.Time) || entry.Time < Time) throw new ArgumentException("Invalid event time.");
-                Number.NonNegative(entry.Amount, "event amount");
+                if (entry.Kind == SimulationEventKind.GrantResource) ValidateGrant(Content.ResourceIndex(entry.TargetId), entry.Amount);
+                else Number.NonNegative(entry.Amount, "event amount");
                 int index;
                 switch (entry.Kind)
                 {
@@ -175,6 +176,7 @@ namespace IncrementalFramework
             for (int i = 0; i < ruleFired.Length; i++)
                 if (TryRuleTime(i, out _) != scheduler.TryGet(ruleTokens[i], out _))
                     throw new ArgumentException("Snapshot is missing an active rule event or contains an inactive one.");
+            changeBefore.Clear(); moduleChanges.Clear(); changedResources.Clear();
         }
     }
 }

@@ -1,10 +1,17 @@
 using System;
+using System.Collections.Generic;
 
 namespace IncrementalFramework
 {
     public sealed partial class Simulation
     {
         private bool[] ruleArmed;
+        private readonly HashSet<int> changedResources = new HashSet<int>();
+        private void FlushResourceTriggers()
+        {
+            foreach (int index in changedResources) NotifyTrigger(RuleTriggerKind.ResourceChanged, index);
+            changedResources.Clear();
+        }
         private static bool ContinuousTrigger(RuleTriggerKind kind) =>
             kind == RuleTriggerKind.Automatic || kind == RuleTriggerKind.ResourceThreshold || kind == RuleTriggerKind.Time;
         private void NotifyTrigger(RuleTriggerKind kind, int target = -1)

@@ -19,9 +19,9 @@ namespace IdleHands.UnityIntegration
         private bool dirty = true;
         private float nextRefresh;
         private bool paused;
+        private bool reloadAfterPause;
         private OfflineResumeResult offlineResume;
-        private SimulationDriver driver;
-        public Simulation Simulation => driver == null ? null : driver.Simulation;
+        public Simulation Simulation { get; private set; }
         public bool SaveOnLifecycle { get; set; } = true;
         public string SavePath => Path.Combine(Application.persistentDataPath, Path.GetFileName(saveFileName));
 
@@ -51,9 +51,14 @@ namespace IdleHands.UnityIntegration
             if (offlineResume != null && !offlineResume.Completed)
             {
                 offlineResume.Continue();
-                OnChanged();
+                dirty = true;
             }
-            else driver.AdvanceTo(Simulation.PendingTarget ?? (Simulation.Time + Time.unscaledDeltaTime));
+            else
+            {
+                var pending = Simulation.PendingTarget;
+                var result = Simulation.AdvanceTo(pending ?? (Simulation.Time + Time.unscaledDeltaTime));
+                if (result.ProcessedEvents != 0 || pending != Simulation.PendingTarget) dirty = true;
+            }
             if (dirty && Time.unscaledTime >= nextRefresh)
             {
                 Refresh();
@@ -64,7 +69,7 @@ namespace IdleHands.UnityIntegration
 
         public CommandResult Execute(ISimulationCommand command)
         {
-            var result = driver.Execute(command);
+            var result = Simulation.Execute(command);
             presenter.Status(result.Success ? "Done." : result.Error);
             return result;
         }
@@ -75,15 +80,19 @@ namespace IdleHands.UnityIntegration
         }
 
         public void Save()
+        { TrySave(); }
+
+        private bool TrySave()
         {
-            if (Simulation == null) return;
+            if (Simulation == null) return false;
             try
             {
                 SnapshotService.Save(SavePath, Simulation, SystemClock.Instance);
                 presenter.Status("Bakery saved.");
+                return true;
             }
             catch (Exception error)
-            { presenter.Status("Save failed: " + error.Message); }
+            { presenter.Status("Save failed: " + error.Message); return false; }
         }
 
         public void Load()
@@ -112,13 +121,13 @@ namespace IdleHands.UnityIntegration
 
         private void SetSimulation(Simulation simulation)
         {
-            if (driver != null) driver.Changed -= OnChanged;
-            driver = new SimulationDriver(simulation);
-            driver.Changed += OnChanged;
+            if (Simulation != null) Simulation.Changed -= OnChanged;
+            Simulation = simulation;
+            Simulation.Changed += OnChanged;
             dirty = true;
         }
 
-        private void OnChanged() { dirty = true; }
+        private void OnChanged(SimulationChangeSet changes) { dirty = true; }
 
         private void Refresh()
         {
@@ -136,19 +145,21 @@ namespace IdleHands.UnityIntegration
                 var view = Simulation.GetProducer(producer.id);
                 var definition = compiled.Content.Producers[compiled.Content.ProducerIndex(producer.id)];
                 var cost = Simulation.GetProducerCost(producer.id);
-                bool allowed = view.Unlocked && MeetsConditions(definition.Prerequisites);
+                bool allowed = view.Unlocked && MeetsCondition(definition.PrerequisiteCondition);
+                string locked = view.Unlocked ? DescribeCondition(definition.PrerequisiteCondition) : "awaiting unlock rule";
                 presenter.Producer(producer.id, producer.displayName + "  [" + view.Owned + "]  |  "
-                    + (allowed ? "Buy: " + Costs(cost) : "Locked: " + Requirements(producer.prerequisites)),
+                    + (allowed ? "Buy: " + Costs(cost) : "Locked: " + locked),
                     allowed && Affordable(cost) && !Simulation.PendingTarget.HasValue);
             }
             foreach (var upgrade in content.upgrades)
             {
                 var view = Simulation.GetUpgrade(upgrade.id);
                 var definition = compiled.Content.Upgrades[compiled.Content.UpgradeIndex(upgrade.id)];
-                bool allowed = view.Unlocked && MeetsConditions(definition.Prerequisites);
+                bool allowed = view.Unlocked && MeetsCondition(definition.PrerequisiteCondition);
+                string locked = view.Unlocked ? DescribeCondition(definition.PrerequisiteCondition) : "awaiting unlock rule";
                 presenter.Upgrade(upgrade.id, upgrade.displayName + "  |  "
                     + (view.Purchased ? "Purchased" : allowed ? "Buy: " + Costs(definition.Costs)
-                    : "Locked: " + Requirements(upgrade.prerequisites)),
+                    : "Locked: " + locked),
                     !view.Purchased && allowed && Affordable(definition.Costs) && !Simulation.PendingTarget.HasValue);
             }
             var ruleStates = content.rules.Length == 0 ? null
@@ -181,7 +192,8 @@ namespace IdleHands.UnityIntegration
             if (offlineResume != null)
             {
                 if (!offlineResume.Completed) presenter.Offline("Processing saved offline progress: "
-                    + offlineResume.RemainingSeconds.ToString("F1") + " seconds remaining…");
+                    + offlineResume.RemainingSeconds.ToString("F1") + " seconds remaining; last chunk "
+                    + offlineResume.Advance.ProcessedEvents + " events / " + offlineResume.Advance.ProcessedWork + " work units.");
                 else
                 {
                     presenter.Offline("Welcome back! Simulated " + offlineResume.OfflineSeconds.ToString("F1") + " seconds (cap "
@@ -231,16 +243,13 @@ namespace IdleHands.UnityIntegration
         }
 
         private bool Affordable(IReadOnlyList<IncrementalFramework.ResourceAmount> costs)
-        { return costs.All(x => Simulation.GetResource(x.ResourceId).Balance >= x.Amount); }
+        {
+            return costs.All(x => compiled.Content.Resources[compiled.Content.ResourceIndex(x.ResourceId)].NegativeAmountPolicy
+                == NegativeAmountPolicy.Allow || Simulation.GetResource(x.ResourceId).Balance >= x.Amount);
+        }
 
         private string Costs(IReadOnlyList<IncrementalFramework.ResourceAmount> costs)
         { return costs.Count == 0 ? "Free" : string.Join(", ", costs.Select(x => compiled.FormatResource(x.ResourceId, x.Amount) + " " + x.ResourceId)); }
-
-        private static string Requirements(Requirement[] requirements)
-        {
-            return requirements.Length == 0 ? "Available" : string.Join(" + ", requirements.Select(
-                x => x.kind + " " + x.targetId + " >= " + x.amount));
-        }
 
         private static string DescribeCondition(ConditionDefinition condition)
         {
@@ -252,8 +261,11 @@ namespace IdleHands.UnityIntegration
                 case ConditionKind.Not: return "NOT (" + DescribeCondition(condition.Children[0]) + ")";
                 case ConditionKind.And:
                 case ConditionKind.Or:
-                    return "(" + string.Join(condition.Kind == ConditionKind.And ? " AND " : " OR ",
-                        condition.Children.Select(DescribeCondition)) + ")";
+                    var children = condition.Kind == ConditionKind.And
+                        ? condition.Children.Where(x => x.Kind != ConditionKind.And || x.Children.Count != 0).ToArray()
+                        : condition.Children.ToArray();
+                    if (children.Length == 0) return condition.Kind == ConditionKind.And ? "Available" : "Never";
+                    return "(" + string.Join(condition.Kind == ConditionKind.And ? " AND " : " OR ", children.Select(DescribeCondition)) + ")";
                 default: return "Invalid condition";
             }
         }
@@ -262,14 +274,23 @@ namespace IdleHands.UnityIntegration
 
         private void OnApplicationPause(bool isPaused)
         {
-            if (isPaused) { if (SaveOnLifecycle) Save(); paused = true; }
-            else if (paused) { paused = false; if (SaveOnLifecycle) Load(); }
+            if (isPaused)
+            {
+                reloadAfterPause = SaveOnLifecycle && TrySave();
+                paused = true;
+            }
+            else if (paused)
+            {
+                paused = false;
+                if (reloadAfterPause) Load();
+                reloadAfterPause = false;
+            }
         }
 
         private void OnApplicationQuit() { if (SaveOnLifecycle) Save(); }
         private void OnDestroy()
         {
-            if (driver != null) driver.Changed -= OnChanged;
+            if (Simulation != null) Simulation.Changed -= OnChanged;
         }
     }
 }

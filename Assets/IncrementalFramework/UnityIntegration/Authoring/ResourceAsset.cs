@@ -2,7 +2,6 @@ using UnityEngine;
 
 namespace IdleHands.UnityIntegration
 {
-    public enum ResourceNegativePolicy { Reject, ClampToZero, Allow }
     public enum ResourceNumberFormat { Fixed, Scientific, Engineering, Compact }
 
     [CreateAssetMenu(menuName = "Idle Hands/Resource")]
@@ -15,7 +14,7 @@ namespace IdleHands.UnityIntegration
         public string startingAmount = "0";
         public bool hasCap;
         public string cap = "1000";
-        public ResourceNegativePolicy negativePolicy;
+        public IncrementalFramework.NegativeAmountPolicy negativePolicy;
         public ResourceNumberFormat numberFormat = ResourceNumberFormat.Compact;
         [Range(0, 12)] public int decimalPlaces = 2;
         [Tooltip("Thousands separators for Fixed and Compact. Fixed notation falls back to scientific outside 1e-6..1e15.")]

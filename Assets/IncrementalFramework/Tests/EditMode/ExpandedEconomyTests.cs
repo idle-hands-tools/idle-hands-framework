@@ -218,5 +218,29 @@ namespace IncrementalFrameworkTests
             Assert.That(simulation.Execute(new BuyUpgradeCommand("gated")).Success, Is.True);
             Assert.That(simulation.GetUpgrade("gated").Purchased, Is.True);
         }
+
+        [TestCase(true)]
+        [TestCase(false)]
+        public void BooleanPurchasePrerequisitesAreAndedWithLegacyRequirementArrays(bool producer)
+        {
+            var legacy = new[] { new RequirementDefinition(RequirementKind.Resource, "gold", 1) };
+            var condition = ConditionDefinition.All(ConditionDefinition.Flag("ready"),
+                ConditionDefinition.Not(ConditionDefinition.Flag("blocked")));
+            var content = new ContentDatabase(new[] { new ResourceDefinition("gold") },
+                new[] { new ProducerDefinition("gated", null, null, prerequisites: legacy, prerequisiteCondition: condition) },
+                new[] { new UpgradeDefinition("gated", null, null, prerequisites: legacy, prerequisiteCondition: condition) },
+                flags: new[] { new FlagDefinition("ready"), new FlagDefinition("blocked") });
+            var simulation = new Simulation(content);
+            ISimulationCommand command = producer ? (ISimulationCommand)new BuyProducerCommand("gated") : new BuyUpgradeCommand("gated");
+            Assert.That(simulation.Execute(command).Success, Is.False);
+            simulation.Execute(new SetFlagCommand("ready", true));
+            Assert.That(simulation.Execute(command).Success, Is.False);
+            simulation.Execute(new GrantResourceCommand("gold", 1));
+            simulation.Execute(new SetFlagCommand("blocked", true));
+            Assert.That(simulation.Execute(command).Success, Is.False);
+            simulation.Execute(new SetFlagCommand("blocked", false));
+            Assert.That(simulation.Execute(command).Success, Is.True);
+            Assert.That(simulation.GetResource("gold").Balance, Is.EqualTo(BigDouble.One));
+        }
     }
 }

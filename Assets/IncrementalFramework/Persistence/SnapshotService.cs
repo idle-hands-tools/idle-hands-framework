@@ -345,9 +345,15 @@ namespace IncrementalFramework
         internal static void AddLegacyLifetime(JObject snapshot)
         {
             if (!(snapshot["state"] is JObject simulation) || !(simulation["resources"] is JArray resources)) return;
+            var serializer = JsonSerializer.Create(CreateSettings());
             foreach (var resource in resources)
                 if (resource is JObject state && state["lifetimeEarned"] == null && state["balance"] != null)
-                    state["lifetimeEarned"] = state["balance"].DeepClone();
+                {
+                    var balance = state["balance"].ToObject<BreakInfinity.BigDouble>(serializer);
+                    state["lifetimeEarned"] = balance < BreakInfinity.BigDouble.Zero
+                        ? JToken.FromObject(BreakInfinity.BigDouble.Zero, serializer)
+                        : state["balance"].DeepClone();
+                }
         }
 
         private static void RejectMetadata(JToken token)

@@ -20,7 +20,7 @@ namespace IncrementalFrameworkTests
         }
 
         [Test]
-        public void SchedulerOrdersByTimeThenPriorityThenInsertionAndCancelsEagerly()
+        public void SchedulerOrdersByTimeThenPriorityThenInsertionAndNeverExecutesCancelledEntries()
         {
             var scheduler = new EventScheduler<string>();
             scheduler.Schedule(20, -10, "last");
@@ -100,6 +100,83 @@ namespace IncrementalFrameworkTests
             Assert.Throws<ArgumentException>(() => new ResourceDefinition("gold", 2, 1));
             Assert.Throws<ArgumentOutOfRangeException>(() => new ProducerDefinition("worker", null, null, 0.9));
             Assert.Throws<ArgumentOutOfRangeException>(() => new ProducerDefinition("worker", null, null, double.NaN));
+        }
+
+        [Test]
+        public void ReschedulePreservesSequenceIncrementsVersionAndInvalidatesEveryStaleToken()
+        {
+            var scheduler = new EventScheduler<string>();
+            var first = scheduler.Schedule(5, 0, "old");
+            scheduler.Schedule(5, 0, "second");
+            var current = scheduler.Reschedule(first, 5, 0, "replacement");
+            Assert.That(current.Value, Is.EqualTo(first.Value));
+            Assert.That(current.Version, Is.EqualTo(first.Version + 1));
+            Assert.That(current, Is.Not.EqualTo(first));
+            Assert.That(scheduler.TryGet(first, out _), Is.False);
+            Assert.That(scheduler.Cancel(first), Is.False);
+            Assert.Throws<ArgumentException>(() => scheduler.Reschedule(first, 5, 0, "stale"));
+            Assert.That(scheduler.Export()[0].Payload, Is.EqualTo("replacement"));
+            Assert.That(scheduler.Export()[0].Token, Is.EqualTo(current));
+            Assert.That(scheduler.Cancel(current), Is.True);
+            Assert.That(scheduler.TryDequeue(out var entry), Is.True);
+            Assert.That(entry.Payload, Is.EqualTo("second"));
+            Assert.That(scheduler.TryDequeue(out _), Is.False);
+        }
+
+        [Test]
+        public void SchedulerExportRestoreKeepsOnlyLiveVersionsAndNeverRevivesTombstones()
+        {
+            var scheduler = new EventScheduler<int>();
+            var original = scheduler.Schedule(10, 0, 1);
+            var current = scheduler.Reschedule(original, 20, 0, 2);
+            var cancelled = scheduler.Schedule(5, 0, 99);
+            scheduler.Cancel(cancelled);
+            var entries = scheduler.Export();
+            Assert.That(entries.Count, Is.EqualTo(1));
+            Assert.That(entries[0].Version, Is.EqualTo(2));
+            var restored = new EventScheduler<int>();
+            restored.Restore(entries, scheduler.NextSequence);
+            Assert.That(restored.Count, Is.EqualTo(1));
+            Assert.That(restored.TryGet(original, out _), Is.False);
+            Assert.That(restored.TryGet(current, out var live), Is.True);
+            Assert.That(live.Payload, Is.EqualTo(2));
+            Assert.That(restored.Cancel(cancelled), Is.False);
+            Assert.That(restored.Cancel(current), Is.True);
+            Assert.That(restored.TryDequeue(out _), Is.False);
+        }
+
+        [Test]
+        public void LazyCancellationPruningHonorsExplicitBudget()
+        {
+            var scheduler = new EventScheduler<int>();
+            var tokens = new List<EventToken>();
+            for (int i = 0; i < 10; i++) tokens.Add(scheduler.Schedule(0, 0, i));
+            scheduler.Schedule(100, 0, 100);
+            foreach (var token in tokens) scheduler.Cancel(token);
+            Assert.That(scheduler.Count, Is.EqualTo(1));
+            Assert.That(scheduler.HasCancelledHead, Is.True);
+            Assert.That(scheduler.PruneCancelled(3), Is.EqualTo(3));
+            Assert.That(scheduler.StorageCount, Is.EqualTo(8));
+            Assert.That(scheduler.HasCancelledHead, Is.True);
+            Assert.That(scheduler.PruneCancelled(0), Is.Zero);
+            Assert.Throws<ArgumentOutOfRangeException>(() => scheduler.PruneCancelled(-1));
+            Assert.That(scheduler.PruneCancelled(20), Is.EqualTo(7));
+            Assert.That(scheduler.TryPeek(out var entry), Is.True);
+            Assert.That(entry.Payload, Is.EqualTo(100));
+        }
+
+        [Test]
+        public void RepeatedReschedulingCompactsTombstonesAndKeepsStorageBounded()
+        {
+            var scheduler = new EventScheduler<int>();
+            var token = scheduler.Schedule(1, 0, 0);
+            for (int i = 1; i <= 5000; i++) token = scheduler.Reschedule(token, i + 1, 0, i);
+            Assert.That(scheduler.Count, Is.EqualTo(1));
+            Assert.That(scheduler.StorageCount, Is.LessThanOrEqualTo(128));
+            Assert.That(token.Version, Is.EqualTo(5001));
+            Assert.That(scheduler.TryDequeue(out var entry), Is.True);
+            Assert.That(entry.Payload, Is.EqualTo(5000));
+            Assert.That(scheduler.TryDequeue(out _), Is.False);
         }
     }
 }

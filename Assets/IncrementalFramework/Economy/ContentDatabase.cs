@@ -164,9 +164,10 @@ namespace IncrementalFramework
                     if (trigger.Kind == RuleTriggerKind.ProducerPurchased) triggerTarget = ProducerIndex(trigger.TargetId);
                     else if (trigger.Kind == RuleTriggerKind.UpgradePurchased) triggerTarget = UpgradeIndex(trigger.TargetId);
                     else if (trigger.Kind == RuleTriggerKind.FlagChanged) triggerTarget = FlagIndex(trigger.TargetId);
-                    else if (trigger.Kind == RuleTriggerKind.ResourceThreshold) triggerTarget = ResourceIndex(trigger.TargetId);
+                    else if (trigger.Kind == RuleTriggerKind.ResourceThreshold || trigger.Kind == RuleTriggerKind.ResourceChanged) triggerTarget = ResourceIndex(trigger.TargetId);
                     else throw new ArgumentException("This trigger has no content target.");
                 }
+                if (trigger.ScheduledEventKind.HasValue) triggerTarget = (int)trigger.ScheduledEventKind.Value;
                 var triggerKey = (trigger.Kind, triggerTarget);
                 if (!triggers.TryGetValue(triggerKey, out var triggered)) { triggered = new List<int>(); triggers.Add(triggerKey, triggered); }
                 triggered.Add(i);
@@ -191,7 +192,12 @@ namespace IncrementalFramework
                 var spendTotals = new SortedDictionary<int, BigDouble>();
                 foreach (var action in Rules[i].Actions)
                 {
-                    if (action is GrantResourceAction grant) actions.Add(new IndexedRuleAction(RuleActionKind.GrantResource, ResourceIndex(grant.ResourceId), grant.Amount));
+                    if (action is GrantResourceAction grant)
+                    {
+                        int resource = ResourceIndex(grant.ResourceId);
+                        ValidateGrantDefinition(resource, grant.Amount);
+                        actions.Add(new IndexedRuleAction(RuleActionKind.GrantResource, resource, grant.Amount));
+                    }
                     else if (action is UnlockProducerAction producer) actions.Add(new IndexedRuleAction(RuleActionKind.UnlockProducer, ProducerIndex(producer.ProducerId)));
                     else if (action is UnlockUpgradeAction upgrade) actions.Add(new IndexedRuleAction(RuleActionKind.UnlockUpgrade, UpgradeIndex(upgrade.UpgradeId)));
                     else if (action is SpendResourceAction spend)
@@ -201,8 +207,13 @@ namespace IncrementalFramework
                         actions.Add(new IndexedRuleAction(RuleActionKind.SpendResource, resource, spend.Amount));
                     }
                     else if (action is SetFlagAction flag) actions.Add(new IndexedRuleAction(RuleActionKind.SetFlag, FlagIndex(flag.FlagId), enabled: flag.Value));
-                    else if (action is ScheduleGrantResourceAction schedule) actions.Add(new IndexedRuleAction(RuleActionKind.ScheduleGrantResource,
-                        ResourceIndex(schedule.ResourceId), schedule.Amount, delay: schedule.Delay, priority: schedule.Priority));
+                    else if (action is ScheduleGrantResourceAction schedule)
+                    {
+                        int resource = ResourceIndex(schedule.ResourceId);
+                        ValidateGrantDefinition(resource, schedule.Amount);
+                        actions.Add(new IndexedRuleAction(RuleActionKind.ScheduleGrantResource,
+                            resource, schedule.Amount, delay: schedule.Delay, priority: schedule.Priority));
+                    }
                     else if (action is SetModifierAction modifier) actions.Add(new IndexedRuleAction(RuleActionKind.SetModifier, ModifierIndex(modifier.ModifierId), enabled: modifier.Enabled));
                     else throw new ArgumentException("Unknown rule action.");
                 }
@@ -211,6 +222,7 @@ namespace IncrementalFramework
                     var combined = new List<IndexedCondition> { conditions[i] };
                     foreach (var cost in spendTotals)
                     {
+                        if (Resources[cost.Key].NegativeAmountPolicy == NegativeAmountPolicy.Allow) continue;
                         var requirement = new IndexedRequirement(RequirementKind.Resource, cost.Key, cost.Value);
                         leaves.Add(requirement);
                         combined.Add(new IndexedCondition(ConditionKind.Requirement, requirement, -1, false, null));
@@ -293,6 +305,11 @@ namespace IncrementalFramework
         public IReadOnlyList<int> AffectedProducers(int upgradeIndex) => affectedProducers[upgradeIndex];
         public IndexedCondition RuleCondition(int index) => conditions[index];
         public IReadOnlyList<int> RulesForFlag(int index) => flagRules[index];
+        private void ValidateGrantDefinition(int resource, BigDouble amount)
+        {
+            if (amount < BigDouble.Zero && Resources[resource].NegativeAmountPolicy == NegativeAmountPolicy.Reject)
+                throw new ArgumentException("Negative rule grant violates resource policy.");
+        }
         public IReadOnlyList<int> RulesForTrigger(RuleTriggerKind kind, int target = -1) =>
             triggerRules.TryGetValue((kind, target), out var rules) ? rules : Array.Empty<int>();
         private IndexedCondition CompileCondition(ConditionDefinition condition, List<IndexedRequirement> leaves, List<int> usedFlags, int depth)

@@ -13,14 +13,19 @@ namespace IncrementalFramework
         public static CommandResult Fail(string error) => new CommandResult(false, error);
     }
 
+    public enum AdvanceDiagnostic { None, EventBudgetExhausted, SameTimeCascade }
+
     public readonly struct AdvanceResult
     {
         public bool Completed { get; }
         public double Time { get; }
         public int ProcessedEvents { get; }
         public int ProcessedWork { get; }
-        public AdvanceResult(bool completed, double time, int processedEvents, int processedWork = -1)
-        { Completed = completed; Time = time; ProcessedEvents = processedEvents; ProcessedWork = processedWork < 0 ? processedEvents : processedWork; }
+        public AdvanceDiagnostic Diagnostic { get; }
+        public AdvanceResult(bool completed, double time, int processedEvents, int processedWork = -1,
+            AdvanceDiagnostic diagnostic = AdvanceDiagnostic.None)
+        { Completed = completed; Time = time; ProcessedEvents = processedEvents; ProcessedWork = processedWork < 0 ? processedEvents : processedWork;
+            Diagnostic = !completed && diagnostic == AdvanceDiagnostic.None ? AdvanceDiagnostic.EventBudgetExhausted : diagnostic; }
     }
 
     public readonly struct EventToken : IEquatable<EventToken>

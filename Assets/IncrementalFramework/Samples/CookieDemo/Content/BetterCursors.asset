@@ -23,6 +23,8 @@ MonoBehaviour:
   - kind: 2
     targetId: cursor
     amount: 1
+  booleanNodes: []
+  rootConditionIndex: -1
   modifiers:
   - scope: 0
     targetId: cursor

@@ -17,6 +17,9 @@ MonoBehaviour:
   triggerKind: 4
   triggerTargetId: oven
   triggerTime: 0
+  filterScheduledEvent: 0
+  scheduledEventKind: 1
+  useResourceThreshold: 1
   triggerResource: {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
   threshold: 0
   conditions:

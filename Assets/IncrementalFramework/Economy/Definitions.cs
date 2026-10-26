@@ -33,7 +33,6 @@ namespace IncrementalFramework
             if (left == BigDouble.Zero || right == BigDouble.Zero) return BigDouble.Zero;
             double mantissa = left.Mantissa * right.Mantissa;
             bool normalize = mantissa >= 10;
-            if (normalize) mantissa /= 10;
             long exponent;
             try
             {
@@ -47,7 +46,11 @@ namespace IncrementalFramework
                 if (exactExponent > long.MaxValue) throw new ArithmeticException("BigDouble exponent overflows.", error);
                 exponent = (long)exactExponent;
             }
-            return BigDouble.FromMantissaExponentNoNormalize(mantissa, exponent);
+            // Guard the port's unchecked exponent arithmetic, but use its multiplication result.
+            BigDouble result = left * right;
+            if (!IsFinite(result) || result.Exponent != exponent)
+                throw new ArithmeticException("BigDouble multiplication exceeds its supported exponent range.");
+            return result;
         }
         public static BigDouble AddSigned(BigDouble left, BigDouble right)
         {
@@ -105,6 +108,8 @@ namespace IncrementalFramework
         { ResourceId = Number.Id(resourceId); Number.NonNegative(amount, nameof(amount)); Amount = amount; }
     }
 
+    public enum NegativeAmountPolicy { Reject, ClampToZero, Allow }
+
     public sealed class ResourceDefinition
     {
         public string Id { get; }
@@ -114,10 +119,19 @@ namespace IncrementalFramework
         public string Category { get; }
         public ResetPolicy PrestigePolicy { get; }
         public BigDouble PrestigeTransform { get; }
+        public NegativeAmountPolicy NegativeAmountPolicy { get; }
         public ResourceDefinition(string id, BigDouble initial = default, BigDouble? cap = null, bool resetOnPrestige = true, string category = null,
-            ResetPolicy? prestigePolicy = null, BigDouble? prestigeTransform = null)
+            ResetPolicy? prestigePolicy = null, BigDouble? prestigeTransform = null, NegativeAmountPolicy negativeAmountPolicy = NegativeAmountPolicy.Reject)
         {
-            Id = Number.Id(id); Number.NonNegative(initial, nameof(initial));
+            Id = Number.Id(id);
+            if (!Enum.IsDefined(typeof(NegativeAmountPolicy), negativeAmountPolicy) || !Number.IsFinite(initial))
+                throw new ArgumentOutOfRangeException(nameof(negativeAmountPolicy));
+            NegativeAmountPolicy = negativeAmountPolicy;
+            if (initial < BigDouble.Zero)
+            {
+                if (negativeAmountPolicy == NegativeAmountPolicy.Reject) throw new ArgumentOutOfRangeException(nameof(initial));
+                if (negativeAmountPolicy == NegativeAmountPolicy.ClampToZero) initial = BigDouble.Zero;
+            }
             if (cap.HasValue) { Number.NonNegative(cap.Value, nameof(cap)); if (initial > cap.Value) throw new ArgumentException("Initial exceeds cap."); }
             Initial = initial; Cap = cap; ResetOnPrestige = resetOnPrestige;
             Category = category;
@@ -263,7 +277,7 @@ namespace IncrementalFramework
         public string ResourceId { get; }
         public BigDouble Amount { get; }
         public GrantResourceAction(string resourceId, BigDouble amount)
-        { ResourceId = Number.Id(resourceId); Number.NonNegative(amount, nameof(amount)); Amount = amount; }
+        { ResourceId = Number.Id(resourceId); if (!Number.IsFinite(amount)) throw new ArgumentOutOfRangeException(nameof(amount)); Amount = amount; }
     }
     public sealed class UnlockProducerAction : RuleAction
     {

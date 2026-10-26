@@ -67,7 +67,15 @@ namespace IncrementalFramework
         private bool sealedTransaction;
         internal SimulationTransaction(ContentDatabase content) { this.content = content; }
         public void Spend(string resourceId, BigDouble amount) => Add(Costs, resourceId, amount);
-        public void Grant(string resourceId, BigDouble amount) => Add(Grants, resourceId, amount);
+        public void Grant(string resourceId, BigDouble amount)
+        {
+            EnsureOpen();
+            int index = content.ResourceIndex(resourceId);
+            if (!Number.IsFinite(amount) || (amount < BigDouble.Zero && content.Resources[index].NegativeAmountPolicy == NegativeAmountPolicy.Reject))
+                throw new ArgumentOutOfRangeException(nameof(amount));
+            Grants.TryGetValue(index, out var old);
+            Grants[index] = Number.AddSigned(old, amount);
+        }
         public void Set<T>(DenseStateStore<T> store, int index, T value) where T : struct
         {
             EnsureOpen(); Values.Set(store, index, value);
@@ -252,7 +260,7 @@ namespace IncrementalFramework
             transaction.Seal();
             if (!result.Success) return true;
             foreach (var cost in transaction.Costs)
-                if (balances[cost.Key] < cost.Value)
+                if (balances[cost.Key] < cost.Value && Content.Resources[cost.Key].NegativeAmountPolicy != NegativeAmountPolicy.Allow)
                 { result = CommandResult.Fail("Insufficient resources for module transaction."); return true; }
             var stagedBalances = new SortedDictionary<int, BigDouble>();
             var stagedLifetime = new SortedDictionary<int, BigDouble>();
@@ -262,13 +270,19 @@ namespace IncrementalFramework
                 BigDouble beforeGrant = stagedBalances.TryGetValue(grant.Key, out var staged) ? staged : balances[grant.Key];
                 BigDouble afterGrant = GrantedBalance(grant.Key, beforeGrant, grant.Value);
                 stagedBalances[grant.Key] = afterGrant;
-                stagedLifetime[grant.Key] = Number.Add(lifetime[grant.Key], Number.AddSigned(afterGrant, -beforeGrant));
+                stagedLifetime[grant.Key] = EarnedAfter(grant.Key, beforeGrant, afterGrant);
             }
             if (!transaction.Values.Validate())
             { result = CommandResult.Fail("Module typed-state transaction is stale."); return true; }
-            foreach (var value in stagedBalances) balances[value.Key] = value.Value;
+            foreach (var value in stagedBalances)
+            {
+                Mark(SimulationChangeKind.Resource, value.Key);
+                if (balances[value.Key] != value.Value) changedResources.Add(value.Key);
+                balances[value.Key] = value.Value;
+            }
             foreach (var value in stagedLifetime) lifetime[value.Key] = value.Value;
             transaction.Values.Commit();
+            CollectModuleChanges(transaction.Values);
             foreach (var value in stagedBalances) RefreshRules(value.Key);
             return true;
         }

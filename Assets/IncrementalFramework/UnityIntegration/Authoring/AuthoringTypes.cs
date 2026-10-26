@@ -30,7 +30,7 @@ namespace IdleHands.UnityIntegration
         public Requirement requirement = new Requirement();
         public string flagId;
         public bool expected = true;
-        [Tooltip("Indices in this rule's booleanNodes array. Not requires exactly one child.")]
+        [Tooltip("Indices in the owner's booleanNodes array. Not requires exactly one child.")]
         public int[] children = new int[0];
     }
 
@@ -41,7 +41,7 @@ namespace IdleHands.UnityIntegration
     public sealed class ProductionModifier
     {
         public AuthoredModifierScope scope;
-        [Tooltip("Producer, resource or category ID. Global ignores this; blank click target applies to all resources.")]
+        [Tooltip("Producer, resource or category ID. Global requires blank; blank click target applies to all resources.")]
         public string targetId;
         public AuthoredModifierKind kind = AuthoredModifierKind.Multiply;
         public int priority;
@@ -55,6 +55,7 @@ namespace IdleHands.UnityIntegration
     public sealed class RuleActionEntry
     {
         public RuleActionKind kind;
+        [Tooltip("Resource/producer/upgrade/flag ID. Leave blank for SetModifier; it uses modifierId.")]
         public string targetId;
         public string amount = "1";
         public bool flagValue = true;

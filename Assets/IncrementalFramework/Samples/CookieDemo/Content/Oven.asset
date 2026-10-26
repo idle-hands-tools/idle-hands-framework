@@ -28,5 +28,7 @@ MonoBehaviour:
     targetId: cookies
     amount: 50
   usePrestigePolicy: 0
+  booleanNodes: []
+  rootConditionIndex: -1
   prestigePolicy: 0
   prestigeTransform: 1

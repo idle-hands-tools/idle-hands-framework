@@ -21,19 +21,23 @@ namespace IdleHands.Tests
         }
 
         [Test]
-        public void DriverNotifiesSuccessfulCommandsAndTimeAdvancement()
+        public void PresenterCanSubscribeToCoalescedCoreChanges()
         {
             var simulation = new IncrementalFramework.Simulation(new IncrementalFramework.ContentDatabase(
                 new[] { new IncrementalFramework.ResourceDefinition("cookies") }));
-            var driver = new SimulationDriver(simulation);
             int notifications = 0;
-            driver.Changed += () => notifications++;
-            Assert.That(driver.Execute(new IncrementalFramework.GrantResourceCommand("cookies", 1)).Success, Is.True);
+            IncrementalFramework.SimulationChangeSet last = null;
+            simulation.Changed += changes => { notifications++; last = changes; };
+            Assert.That(simulation.Execute(new IncrementalFramework.GrantResourceCommand("cookies", 1)).Success, Is.True);
             Assert.That(notifications, Is.EqualTo(1));
-            Assert.That(driver.Execute(new IncrementalFramework.GrantResourceCommand("cookies", -1)).Success, Is.False);
+            Assert.That(simulation.Execute(new IncrementalFramework.GrantResourceCommand("cookies", -1)).Success, Is.False);
             Assert.That(notifications, Is.EqualTo(1));
-            driver.AdvanceTo(1);
+            simulation.AdvanceTo(1);
+            Assert.That(notifications, Is.EqualTo(1));
+            Assert.That(simulation.Execute(new IncrementalFramework.GrantResourceCommand("cookies", 2)).Success, Is.True);
             Assert.That(notifications, Is.EqualTo(2));
+            Assert.That(last.Deltas.Count, Is.EqualTo(1));
+            Assert.That(last.Deltas[0].After.Amount, Is.EqualTo(new BreakInfinity.BigDouble(3)));
         }
 
         [Test]
@@ -111,9 +115,11 @@ namespace IdleHands.Tests
             var producer = ScriptableObject.CreateInstance<ProducerAsset>();
             var upgrade = ScriptableObject.CreateInstance<UpgradeAsset>();
             var rule = ScriptableObject.CreateInstance<RuleAsset>();
+            var flag = ScriptableObject.CreateInstance<FlagAsset>();
             try
             {
                 resource.id = "cookies";
+                flag.id = "ready";
                 producer.id = "cursor";
                 producer.costs = new[] { new ResourceAmount { resource = resource, amount = "1" } };
                 producer.productionPerSecond = new[] { new ResourceAmount { resource = resource, amount = "1" } };
@@ -122,10 +128,19 @@ namespace IdleHands.Tests
                     new Requirement { kind = RequirementKind.Resource, targetId = "cookies", amount = "2" },
                     new Requirement { kind = RequirementKind.LifetimeResource, targetId = "cookies", amount = "2" }
                 };
+                producer.rootConditionIndex = 0;
+                producer.booleanNodes = new[]
+                { new ConditionNode { operation = ConditionOperator.Flag, flagId = "ready" } };
                 upgrade.id = "clicks";
                 upgrade.costs = new[] { new ResourceAmount { resource = resource, amount = "1" } };
                 upgrade.prerequisites = new[]
                 { new Requirement { kind = RequirementKind.Producer, targetId = "cursor", amount = "1" } };
+                upgrade.rootConditionIndex = 0;
+                upgrade.booleanNodes = new[]
+                {
+                    new ConditionNode { operation = ConditionOperator.Not, children = new[] { 1 } },
+                    new ConditionNode { operation = ConditionOperator.Flag, flagId = "ready", expected = false }
+                };
                 upgrade.modifiers = new[]
                 { new ProductionModifier { scope = AuthoredModifierScope.Click, targetId = "cookies",
                     kind = AuthoredModifierKind.Multiply, value = "2" } };
@@ -141,11 +156,14 @@ namespace IdleHands.Tests
                 content.producers = new[] { producer };
                 content.upgrades = new[] { upgrade };
                 content.rules = new[] { rule };
+                content.flags = new[] { flag };
                 content.clickResource = resource;
                 var simulation = new IncrementalFramework.Simulation(ContentCompiler.Compile(content).Content);
                 Assert.That(simulation.Execute(new IncrementalFramework.BuyProducerCommand("cursor")).Success, Is.False);
                 Assert.That(simulation.Execute(new IncrementalFramework.ClickCommand("cookies", 1)).Success, Is.True);
                 Assert.That(simulation.Execute(new IncrementalFramework.ClickCommand("cookies", 1)).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.BuyProducerCommand("cursor")).Success, Is.False);
+                Assert.That(simulation.Execute(new IncrementalFramework.SetFlagCommand("ready", true)).Success, Is.True);
                 Assert.That(simulation.Execute(new IncrementalFramework.BuyProducerCommand("cursor")).Success, Is.True);
                 Assert.That(simulation.Execute(new IncrementalFramework.BuyUpgradeCommand("clicks")).Success, Is.True);
                 Assert.That(simulation.AdvanceTo(0).Completed, Is.True);
@@ -161,6 +179,7 @@ namespace IdleHands.Tests
                 UnityEngine.Object.DestroyImmediate(producer);
                 UnityEngine.Object.DestroyImmediate(upgrade);
                 UnityEngine.Object.DestroyImmediate(rule);
+                UnityEngine.Object.DestroyImmediate(flag);
             }
         }
 
@@ -362,6 +381,71 @@ namespace IdleHands.Tests
         }
 
         [Test]
+        public void NegativePoliciesAndResourceChangedScheduledEventFiltersCompileAndExecute()
+        {
+            var content = ScriptableObject.CreateInstance<GameContentAsset>();
+            var resource = ScriptableObject.CreateInstance<ResourceAsset>();
+            var producer = ScriptableObject.CreateInstance<ProducerAsset>();
+            var changedFlag = ScriptableObject.CreateInstance<FlagAsset>();
+            var scheduledFlag = ScriptableObject.CreateInstance<FlagAsset>();
+            var changed = ScriptableObject.CreateInstance<RuleAsset>();
+            var scheduled = ScriptableObject.CreateInstance<RuleAsset>();
+            try
+            {
+                resource.id = "credit";
+                resource.startingAmount = "-3";
+                resource.negativePolicy = IncrementalFramework.NegativeAmountPolicy.ClampToZero;
+                producer.id = "cursor";
+                producer.costs = new[] { new ResourceAmount { resource = resource, amount = "2" } };
+                producer.productionPerSecond = new[] { new ResourceAmount { resource = resource, amount = "1" } };
+                changedFlag.id = "changed";
+                scheduledFlag.id = "scheduled";
+                changed.id = "on-change";
+                changed.useResourceThreshold = false;
+                changed.triggerKind = IncrementalFramework.RuleTriggerKind.ResourceChanged;
+                changed.triggerTargetId = "credit";
+                changed.actions = new[]
+                { new RuleActionEntry { kind = RuleActionKind.SetFlag, targetId = "changed" } };
+                scheduled.id = "on-scheduled-grant";
+                scheduled.useResourceThreshold = false;
+                scheduled.triggerKind = IncrementalFramework.RuleTriggerKind.ScheduledEvent;
+                scheduled.filterScheduledEvent = true;
+                scheduled.scheduledEventKind = IncrementalFramework.ScheduledEventTriggerKind.GrantResource;
+                scheduled.actions = new[]
+                { new RuleActionEntry { kind = RuleActionKind.SetFlag, targetId = "scheduled" } };
+                content.resources = new[] { resource };
+                content.producers = new[] { producer };
+                content.flags = new[] { changedFlag, scheduledFlag };
+                content.rules = new[] { changed, scheduled };
+                content.clickResource = resource;
+                Assert.That(ContentCompiler.Compile(content).Content.Resources[0].Initial, Is.EqualTo(BreakInfinity.BigDouble.Zero));
+                resource.negativePolicy = IncrementalFramework.NegativeAmountPolicy.Reject;
+                Assert.Throws<ContentValidationException>(() => ContentCompiler.Compile(content));
+                resource.negativePolicy = IncrementalFramework.NegativeAmountPolicy.Allow;
+                var simulation = new IncrementalFramework.Simulation(ContentCompiler.Compile(content).Content);
+                Assert.That(simulation.GetResource("credit").Balance, Is.EqualTo(new BreakInfinity.BigDouble(-3)));
+                Assert.That(simulation.Execute(new IncrementalFramework.BuyProducerCommand("cursor")).Success, Is.True);
+                Assert.That(simulation.GetResource("credit").Balance, Is.EqualTo(new BreakInfinity.BigDouble(-5)));
+                Assert.That(simulation.AdvanceTo(0).Completed, Is.True);
+                Assert.That(simulation.GetFlag("changed"), Is.True);
+                simulation.Schedule(new IncrementalFramework.GrantResourceCommand("credit", 1), 0);
+                Assert.That(simulation.AdvanceTo(0).Completed, Is.True);
+                Assert.That(simulation.GetFlag("scheduled"), Is.True);
+                Assert.That(simulation.GetResource("credit").Balance, Is.EqualTo(new BreakInfinity.BigDouble(-4)));
+            }
+            finally
+            {
+                UnityEngine.Object.DestroyImmediate(content);
+                UnityEngine.Object.DestroyImmediate(resource);
+                UnityEngine.Object.DestroyImmediate(producer);
+                UnityEngine.Object.DestroyImmediate(changedFlag);
+                UnityEngine.Object.DestroyImmediate(scheduledFlag);
+                UnityEngine.Object.DestroyImmediate(changed);
+                UnityEngine.Object.DestroyImmediate(scheduled);
+            }
+        }
+
+        [Test]
         public void ReportsMissingReferencesAndInvalidNumbersTogether()
         {
             var content = ScriptableObject.CreateInstance<GameContentAsset>();
@@ -370,7 +454,7 @@ namespace IdleHands.Tests
             {
                 resource.id = "cookies";
                 resource.startingAmount = "1e2e3";
-                resource.negativePolicy = ResourceNegativePolicy.Allow;
+                resource.negativePolicy = (IncrementalFramework.NegativeAmountPolicy)999;
                 content.resources = new[] { resource, resource };
                 content.clickAmount = "NaN";
                 var errors = ContentCompiler.Validate(content);

@@ -22,7 +22,8 @@ namespace IncrementalFramework
                 if (action.Kind == RuleActionKind.SpendResource)
                 {
                     BigDouble balance = staged.TryGetValue(action.TargetIndex, out var previous) ? previous : balances[action.TargetIndex];
-                    if (balance < action.Amount) { LastEventResult = CommandResult.Fail("Rule cannot afford its complete transaction."); RefreshRule(index); return; }
+                    if (balance < action.Amount && Content.Resources[action.TargetIndex].NegativeAmountPolicy != NegativeAmountPolicy.Allow)
+                    { LastEventResult = CommandResult.Fail("Rule cannot afford its complete transaction."); RefreshRule(index); return; }
                     staged[action.TargetIndex] = Number.AddSigned(balance, -action.Amount);
                 }
             foreach (var action in actions)
@@ -34,7 +35,8 @@ namespace IncrementalFramework
                         BigDouble before = staged.TryGetValue(target, out var previous) ? previous : balances[target];
                         BigDouble after = GrantedBalance(target, before, action.Amount);
                         BigDouble oldEarned = earned.TryGetValue(target, out var e) ? e : lifetime[target];
-                        earned[target] = Number.Add(oldEarned, Number.AddSigned(after, -before)); staged[target] = after; break;
+                        earned[target] = after > before ? Number.Add(oldEarned, Number.AddSigned(after, -before)) : oldEarned;
+                        staged[target] = after; break;
                     case RuleActionKind.SetFlag: stagedFlags[target] = action.Enabled; break;
                     case RuleActionKind.SetModifier: proposedModifiers[target] = action.Enabled; changeModifiers = true; break;
                     case RuleActionKind.ScheduleGrantResource:
@@ -56,21 +58,30 @@ namespace IncrementalFramework
             if (rule.Cooldown > 0 && eligible <= Time) eligible = NextTime(Time);
             if (!Finite(eligible)) { ruleDisabled[index] = true; eligible = Time; }
             ruleEligible[index] = eligible;
-            foreach (var value in staged) balances[value.Key] = value.Value;
+            foreach (var value in staged)
+            {
+                Mark(SimulationChangeKind.Resource, value.Key);
+                if (balances[value.Key] != value.Value) changedResources.Add(value.Key);
+                balances[value.Key] = value.Value;
+            }
             foreach (var value in earned) lifetime[value.Key] = value.Value;
             var changedFlags = new List<int>();
             foreach (var value in stagedFlags)
-            { if (flags[value.Key] != value.Value) changedFlags.Add(value.Key); flags[value.Key] = value.Value; }
+            { Mark(SimulationChangeKind.Flag, value.Key);
+                if (flags[value.Key] != value.Value) changedFlags.Add(value.Key); flags[value.Key] = value.Value; }
             foreach (var action in actions)
             {
-                if (action.Kind == RuleActionKind.UnlockProducer) producerUnlocked[action.TargetIndex] = true;
-                else if (action.Kind == RuleActionKind.UnlockUpgrade) upgradeUnlocked[action.TargetIndex] = true;
+                if (action.Kind == RuleActionKind.UnlockProducer)
+                { Mark(SimulationChangeKind.Producer, action.TargetIndex); producerUnlocked[action.TargetIndex] = true; }
+                else if (action.Kind == RuleActionKind.UnlockUpgrade)
+                { Mark(SimulationChangeKind.Upgrade, action.TargetIndex); upgradeUnlocked[action.TargetIndex] = true; }
             }
             foreach (var entry in scheduled) scheduler.Schedule(entry.Time, entry.Priority, entry.Payload);
             if (changeModifiers) CommitModifierChange(proposedModifiers, outputs, clicks, targets);
             foreach (var value in staged) RefreshRules(value.Key);
             foreach (var value in stagedFlags) foreach (int dependent in Content.RulesForFlag(value.Key)) RefreshRule(dependent);
             foreach (int flag in changedFlags) NotifyTrigger(RuleTriggerKind.FlagChanged, flag);
+            FlushResourceTriggers();
             RefreshRule(index); LastEventResult = CommandResult.Ok();
         }
     }
