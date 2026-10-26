@@ -19,9 +19,9 @@ namespace IdleHands.UnityIntegration
         private bool dirty = true;
         private float nextRefresh;
         private bool paused;
-        private Dictionary<string, BigDouble> offlineBefore;
-        private double offlineSeconds;
-        public Simulation Simulation { get; private set; }
+        private OfflineResumeResult offlineResume;
+        private SimulationDriver driver;
+        public Simulation Simulation => driver == null ? null : driver.Simulation;
         public bool SaveOnLifecycle { get; set; } = true;
         public string SavePath => Path.Combine(Application.persistentDataPath, Path.GetFileName(saveFileName));
 
@@ -33,7 +33,7 @@ namespace IdleHands.UnityIntegration
                 presenter = new CookiePresenter(transform, content, Bake,
                     id => Execute(new BuyProducerCommand(id)),
                     id => Execute(new BuyUpgradeCommand(id)),
-                    () => Execute(new PrestigeCommand()), Save, Load);
+                    () => Execute(new PrestigeCommand()), Save, Load, id => Execute(new TriggerRuleCommand(id)));
                 SetSimulation(new Simulation(compiled.Content));
                 if (autoLoad && (File.Exists(SavePath) || File.Exists(SavePath + ".bak"))) Load();
                 Refresh();
@@ -48,7 +48,12 @@ namespace IdleHands.UnityIntegration
         private void Update()
         {
             if (Simulation == null || paused) return;
-            Simulation.AdvanceTo(Simulation.PendingTarget ?? (Simulation.Time + Time.unscaledDeltaTime));
+            if (offlineResume != null && !offlineResume.Completed)
+            {
+                offlineResume.Continue();
+                OnChanged();
+            }
+            else driver.AdvanceTo(Simulation.PendingTarget ?? (Simulation.Time + Time.unscaledDeltaTime));
             if (dirty && Time.unscaledTime >= nextRefresh)
             {
                 Refresh();
@@ -59,14 +64,14 @@ namespace IdleHands.UnityIntegration
 
         public CommandResult Execute(ISimulationCommand command)
         {
-            var result = Simulation.Execute(command);
+            var result = driver.Execute(command);
             presenter.Status(result.Success ? "Done." : result.Error);
             return result;
         }
 
         public void Bake()
         {
-            Execute(new GrantResourceCommand(compiled.ClickResourceId, compiled.ClickAmount));
+            Execute(new ClickCommand(compiled.ClickResourceId, compiled.ClickAmount));
         }
 
         public void Save()
@@ -74,7 +79,7 @@ namespace IdleHands.UnityIntegration
             if (Simulation == null) return;
             try
             {
-                SnapshotService.Save(SavePath, Simulation, DateTime.UtcNow);
+                SnapshotService.Save(SavePath, Simulation, SystemClock.Instance);
                 presenter.Status("Bakery saved.");
             }
             catch (Exception error)
@@ -86,19 +91,12 @@ namespace IdleHands.UnityIntegration
             if (compiled == null) return;
             try
             {
-                SimulationSnapshot snapshot;
-                try { snapshot = SnapshotService.Deserialize(File.ReadAllText(SavePath)); }
+                OfflineResumeResult resumed;
+                try { resumed = ReadResume(SavePath); }
                 catch (Exception) when (File.Exists(SavePath + ".bak"))
-                { snapshot = SnapshotService.Deserialize(File.ReadAllText(SavePath + ".bak")); }
-                var restored = SnapshotService.Restore(compiled.Content, snapshot);
-                var before = restored.Resources.ToDictionary(x => x.Id, x => x.Balance);
-                double seconds = Math.Min(compiled.MaximumOfflineSeconds,
-                    Math.Max(0, (DateTime.UtcNow - snapshot.SavedAtUtc).TotalSeconds));
-                double target = (restored.PendingTarget ?? restored.Time) + seconds;
-                restored.AdvanceTo(target);
-                SetSimulation(restored);
-                offlineBefore = before;
-                offlineSeconds = seconds;
+                { resumed = ReadResume(SavePath + ".bak"); }
+                SetSimulation(resumed.Simulation);
+                offlineResume = resumed;
                 presenter.Status("Saved bakery loaded.");
                 dirty = true;
             }
@@ -106,11 +104,17 @@ namespace IdleHands.UnityIntegration
             { presenter.Status("Load failed; current bakery was not changed: " + error.Message); }
         }
 
+        private OfflineResumeResult ReadResume(string path)
+        {
+            var snapshot = SnapshotService.ReadSnapshot(path);
+            return SnapshotService.Resume(compiled.Content, snapshot, SystemClock.Instance, compiled.MaximumOfflineSeconds);
+        }
+
         private void SetSimulation(Simulation simulation)
         {
-            if (Simulation != null) Simulation.Changed -= OnChanged;
-            Simulation = simulation;
-            Simulation.Changed += OnChanged;
+            if (driver != null) driver.Changed -= OnChanged;
+            driver = new SimulationDriver(simulation);
+            driver.Changed += OnChanged;
             dirty = true;
         }
 
@@ -121,15 +125,18 @@ namespace IdleHands.UnityIntegration
             foreach (var resource in content.resources)
             {
                 var view = Simulation.GetResource(resource.id);
-                string click = resource.id == compiled.ClickResourceId ? "  |  Click to bake +" + Format(compiled.ClickAmount) : "";
-                presenter.Resource(resource.id, resource.displayName + ": " + Format(view.Balance)
-                    + "  (" + Format(view.Rate) + "/sec)" + click);
+                string click = resource.id == compiled.ClickResourceId
+                    ? "  |  Click to bake (base +" + compiled.FormatResource(resource.id, compiled.ClickAmount) + ")" : "";
+                string cap = view.Cap.HasValue ? " / " + compiled.FormatResource(resource.id, view.Cap.Value) : "";
+                presenter.Resource(resource.id, resource.displayName + ": " + compiled.FormatResource(resource.id, view.Balance) + cap
+                    + "  (" + compiled.FormatResource(resource.id, view.Rate) + "/sec)" + click);
             }
             foreach (var producer in content.producers)
             {
                 var view = Simulation.GetProducer(producer.id);
+                var definition = compiled.Content.Producers[compiled.Content.ProducerIndex(producer.id)];
                 var cost = Simulation.GetProducerCost(producer.id);
-                bool allowed = view.Unlocked && Meets(producer.prerequisites);
+                bool allowed = view.Unlocked && MeetsConditions(definition.Prerequisites);
                 presenter.Producer(producer.id, producer.displayName + "  [" + view.Owned + "]  |  "
                     + (allowed ? "Buy: " + Costs(cost) : "Locked: " + Requirements(producer.prerequisites)),
                     allowed && Affordable(cost) && !Simulation.PendingTarget.HasValue);
@@ -138,53 +145,117 @@ namespace IdleHands.UnityIntegration
             {
                 var view = Simulation.GetUpgrade(upgrade.id);
                 var definition = compiled.Content.Upgrades[compiled.Content.UpgradeIndex(upgrade.id)];
-                bool allowed = view.Unlocked && Meets(upgrade.prerequisites);
+                bool allowed = view.Unlocked && MeetsConditions(definition.Prerequisites);
                 presenter.Upgrade(upgrade.id, upgrade.displayName + "  |  "
                     + (view.Purchased ? "Purchased" : allowed ? "Buy: " + Costs(definition.Costs)
                     : "Locked: " + Requirements(upgrade.prerequisites)),
                     !view.Purchased && allowed && Affordable(definition.Costs) && !Simulation.PendingTarget.HasValue);
             }
+            var ruleStates = content.rules.Length == 0 ? null
+                : Simulation.ExportState().Rules.ToDictionary(x => x.Id, x => x.Fired);
             foreach (var rule in content.rules)
-                presenter.Rule(rule.id, (Simulation.HasRuleFired(rule.id) ? "UNLOCKED  " : "LOCKED  ")
-                    + rule.displayName + "  |  "
-                    + (rule.triggerResource == null ? compiled.ClickResourceId : rule.triggerResource.id)
-                    + " >= " + rule.threshold + " + " + Requirements(rule.conditions));
-            var prestige = compiled.Content.Prestige;
-            presenter.Prestige(prestige == null ? "Prestige disabled" : "Prestige [" + Simulation.PrestigeCount
-                + "]  |  Requires " + Format(prestige.Threshold) + " " + prestige.ResourceId
-                + "; reset bakery, retain x" + Format(prestige.MultiplierPerPrestige) + " production per prestige",
-                prestige != null && Simulation.GetResource(prestige.ResourceId).Balance >= prestige.Threshold
-                && !Simulation.PendingTarget.HasValue);
-            if (offlineBefore != null)
             {
-                if (Simulation.PendingTarget.HasValue) presenter.Offline("Processing saved offline progress…");
+                var definition = compiled.Content.Rules.First(x => x.Id == rule.id);
+                presenter.Rule(rule.id, (rule.triggerKind == RuleTriggerKind.Manual ? "TRIGGER / " : "")
+                    + (ruleStates[rule.id] ? "UNLOCKED  " : "LOCKED  ") + rule.displayName
+                    + "  |  " + DescribeCondition(definition.Condition),
+                    !Simulation.PendingTarget.HasValue && (!ruleStates[rule.id] || definition.Repeat)
+                    && MeetsCondition(definition.Condition));
+            }
+            var prestige = compiled.Content.Prestige;
+            if (prestige != null && prestige.UsesLifetimeReward)
+            {
+                var reward = Simulation.GetPrestigeReward();
+                presenter.Prestige("Prestige [" + Simulation.PrestigeCount + "]  |  Claim "
+                    + compiled.FormatResource(prestige.RewardResourceId, reward) + " " + prestige.RewardResourceId
+                    + "; lifetime " + compiled.FormatResource(prestige.ResourceId, Simulation.GetResource(prestige.ResourceId).LifetimeEarned)
+                    + " / base " + compiled.FormatResource(prestige.ResourceId, prestige.Threshold)
+                    + " " + prestige.ResourceId + ". Apply reset policies; production x" + Format(Simulation.PermanentMultiplier),
+                    reward > BigDouble.Zero && !Simulation.PendingTarget.HasValue);
+            }
+            else presenter.Prestige(prestige == null ? "Prestige disabled" : "Prestige [" + Simulation.PrestigeCount
+                    + "]  |  Requires " + compiled.FormatResource(prestige.ResourceId, prestige.Threshold) + " " + prestige.ResourceId
+                    + "; apply reset policies, retain x" + Format(prestige.MultiplierPerPrestige) + " production per prestige",
+                    prestige != null && Simulation.GetResource(prestige.ResourceId).Balance >= prestige.Threshold
+                    && !Simulation.PendingTarget.HasValue);
+            if (offlineResume != null)
+            {
+                if (!offlineResume.Completed) presenter.Offline("Processing saved offline progress: "
+                    + offlineResume.RemainingSeconds.ToString("F1") + " seconds remaining…");
                 else
                 {
-                    presenter.Offline("Welcome back! Simulated " + offlineSeconds.ToString("F1") + " seconds (cap "
+                    presenter.Offline("Welcome back! Simulated " + offlineResume.OfflineSeconds.ToString("F1") + " seconds (cap "
                         + compiled.MaximumOfflineSeconds.ToString("F0") + "s): "
-                        + string.Join(", ", Simulation.Resources.Select(x => x.Id + " "
-                            + Format(x.Balance - offlineBefore[x.Id]))));
-                    offlineBefore = null;
+                        + string.Join(", ", offlineResume.Gains.Select(x => x.ResourceId + " "
+                            + compiled.FormatResource(x.ResourceId, x.NetGain))));
+                    offlineResume = null;
                 }
             }
         }
 
-        private bool Meets(Requirement[] requirements)
+        private bool MeetsConditions(IReadOnlyList<RequirementDefinition> requirements)
         {
-            return Simulation.MeetsConditions(requirements.Select(x => new ConditionDefinition(
-                (ConditionKind)(int)x.kind, x.targetId, ContentCompiler.ReadNumber(x.amount))).ToArray());
+            foreach (var requirement in requirements)
+            {
+                BigDouble value;
+                switch (requirement.Kind)
+                {
+                    case IncrementalFramework.RequirementKind.Resource:
+                        value = Simulation.GetResource(requirement.TargetId).Balance; break;
+                    case IncrementalFramework.RequirementKind.LifetimeResource:
+                        value = Simulation.GetResource(requirement.TargetId).LifetimeEarned; break;
+                    case IncrementalFramework.RequirementKind.Producer:
+                        value = new BigDouble(Simulation.GetProducer(requirement.TargetId).Owned); break;
+                    case IncrementalFramework.RequirementKind.Upgrade:
+                        value = Simulation.GetUpgrade(requirement.TargetId).Purchased ? BigDouble.One : BigDouble.Zero; break;
+                    case IncrementalFramework.RequirementKind.Prestige:
+                        value = new BigDouble(Simulation.PrestigeCount); break;
+                    default: return false;
+                }
+                if (value < requirement.Amount) return false;
+            }
+            return true;
+        }
+
+        private bool MeetsCondition(ConditionDefinition condition)
+        {
+            switch (condition.Kind)
+            {
+                case ConditionKind.Requirement: return MeetsConditions(new[] { condition.Requirement });
+                case ConditionKind.Flag: return Simulation.GetFlag(condition.FlagId) == condition.Expected;
+                case ConditionKind.And: return condition.Children.All(MeetsCondition);
+                case ConditionKind.Or: return condition.Children.Any(MeetsCondition);
+                case ConditionKind.Not: return !MeetsCondition(condition.Children[0]);
+                default: return false;
+            }
         }
 
         private bool Affordable(IReadOnlyList<IncrementalFramework.ResourceAmount> costs)
         { return costs.All(x => Simulation.GetResource(x.ResourceId).Balance >= x.Amount); }
 
-        private static string Costs(IReadOnlyList<IncrementalFramework.ResourceAmount> costs)
-        { return costs.Count == 0 ? "Free" : string.Join(", ", costs.Select(x => Format(x.Amount) + " " + x.ResourceId)); }
+        private string Costs(IReadOnlyList<IncrementalFramework.ResourceAmount> costs)
+        { return costs.Count == 0 ? "Free" : string.Join(", ", costs.Select(x => compiled.FormatResource(x.ResourceId, x.Amount) + " " + x.ResourceId)); }
 
         private static string Requirements(Requirement[] requirements)
         {
             return requirements.Length == 0 ? "Available" : string.Join(" + ", requirements.Select(
                 x => x.kind + " " + x.targetId + " >= " + x.amount));
+        }
+
+        private static string DescribeCondition(ConditionDefinition condition)
+        {
+            switch (condition.Kind)
+            {
+                case ConditionKind.Requirement:
+                    return condition.Requirement.Kind + " " + condition.Requirement.TargetId + " >= " + Format(condition.Requirement.Amount);
+                case ConditionKind.Flag: return condition.FlagId + " = " + condition.Expected;
+                case ConditionKind.Not: return "NOT (" + DescribeCondition(condition.Children[0]) + ")";
+                case ConditionKind.And:
+                case ConditionKind.Or:
+                    return "(" + string.Join(condition.Kind == ConditionKind.And ? " AND " : " OR ",
+                        condition.Children.Select(DescribeCondition)) + ")";
+                default: return "Invalid condition";
+            }
         }
 
         private static string Format(BigDouble number) { return number.ToString("G4"); }
@@ -198,7 +269,7 @@ namespace IdleHands.UnityIntegration
         private void OnApplicationQuit() { if (SaveOnLifecycle) Save(); }
         private void OnDestroy()
         {
-            if (Simulation != null) Simulation.Changed -= OnChanged;
+            if (driver != null) driver.Changed -= OnChanged;
         }
     }
 }

@@ -28,13 +28,14 @@ namespace IncrementalFramework
                     string kind = action is GrantResourceAction ? "grantResource"
                         : action is UnlockProducerAction ? "unlockProducer"
                         : action is UnlockUpgradeAction ? "unlockUpgrade"
+                        : action is SpendResourceAction ? "spendResource"
+                        : action is SetFlagAction ? "setFlag"
+                        : action is ScheduleGrantResourceAction ? "scheduleGrantResource"
+                        : action is SetModifierAction ? "setModifier"
                         : throw new ArgumentException("Unknown rule action.");
                     ((JObject)actions[j]).Add("kind", kind);
                 }
             }
-            foreach (string collection in new[] { "resources", "producers", "upgrades", "rules" })
-                root[collection] = new JArray(((JArray)root[collection])
-                    .OrderBy(definition => definition.Value<string>("id"), StringComparer.Ordinal));
             string canonical = Canonicalize(root).ToString(Formatting.None);
             using (var hash = SHA256.Create())
             {

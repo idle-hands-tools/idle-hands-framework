@@ -3,8 +3,16 @@ using System.Collections.Generic;
 
 namespace IncrementalFramework
 {
+    public interface IReadOnlyStateStore<T> where T : struct
+    {
+        int Count { get; }
+        T this[int index] { get; }
+        string StableId(int index);
+        int IndexOf(string id);
+    }
+
     /// <summary>Module-owned value state: stable save keys and dense runtime indexes.</summary>
-    public sealed class DenseStateStore<T> where T : struct
+    public sealed class DenseStateStore<T> : IReadOnlyStateStore<T> where T : struct
     {
         private readonly Dictionary<string, int> ids = new Dictionary<string, int>(StringComparer.Ordinal);
         private readonly List<string> keys = new List<string>();

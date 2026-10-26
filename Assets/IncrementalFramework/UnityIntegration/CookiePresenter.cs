@@ -12,6 +12,7 @@ namespace IdleHands.UnityIntegration
         private readonly Dictionary<string, Button> producers = new Dictionary<string, Button>();
         private readonly Dictionary<string, Button> upgrades = new Dictionary<string, Button>();
         private readonly Dictionary<string, Text> rules = new Dictionary<string, Text>();
+        private readonly Dictionary<string, Button> manualRules = new Dictionary<string, Button>();
         private readonly Font font;
         private readonly Transform rows;
         private readonly Text status;
@@ -19,7 +20,8 @@ namespace IdleHands.UnityIntegration
         private readonly Button prestige;
 
         public CookiePresenter(Transform parent, GameContentAsset content, Action click,
-            Action<string> buyProducer, Action<string> buyUpgrade, Action doPrestige, Action save, Action load)
+            Action<string> buyProducer, Action<string> buyUpgrade, Action doPrestige, Action save, Action load,
+            Action<string> triggerRule)
         {
             font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             var canvasObject = new GameObject("CookieDemo UI", typeof(RectTransform), typeof(Canvas),
@@ -54,6 +56,7 @@ namespace IdleHands.UnityIntegration
             scroll.viewport = scrollObject;
             scroll.content = contentRect;
             scroll.horizontal = false;
+            scroll.scrollSensitivity = 30;
             scroll.movementType = ScrollRect.MovementType.Clamped;
             rows = contentRect;
             Label("IDLE HANDS  /  COOKIE BAKERY", 30, 52);
@@ -82,7 +85,17 @@ namespace IdleHands.UnityIntegration
                 upgrades.Add(id, Button(upgrade.displayName, () => buyUpgrade(id)));
             }
             Label("MILESTONES", 20, 34);
-            foreach (var rule in content.rules) rules.Add(rule.id, Label(rule.displayName, 18, 38));
+            foreach (var rule in content.rules)
+            {
+                if (rule.triggerKind == IncrementalFramework.RuleTriggerKind.Manual)
+                {
+                    string id = rule.id;
+                    var button = Button(rule.displayName, () => triggerRule(id));
+                    rules.Add(id, button.GetComponentInChildren<Text>());
+                    manualRules.Add(id, button);
+                }
+                else rules.Add(rule.id, Label(rule.displayName, 18, 38));
+            }
             prestige = Button("Prestige", doPrestige);
             Button("Save bakery", save);
             Button("Load saved bakery", load);
@@ -97,7 +110,12 @@ namespace IdleHands.UnityIntegration
         public void Resource(string id, string text) { resources[id].text = text; }
         public void Producer(string id, string text, bool enabled) { Set(producers[id], text, enabled); }
         public void Upgrade(string id, string text, bool enabled) { Set(upgrades[id], text, enabled); }
-        public void Rule(string id, string text) { rules[id].text = text; }
+        public void Rule(string id, string text, bool triggerable)
+        {
+            rules[id].text = text;
+            Button button;
+            if (manualRules.TryGetValue(id, out button)) button.interactable = triggerable;
+        }
         public void Prestige(string text, bool enabled) { Set(prestige, text, enabled); }
         public void Status(string text) { status.text = text; }
         public void Offline(string text) { offline.text = text; }
@@ -111,7 +129,7 @@ namespace IdleHands.UnityIntegration
         private Text Label(string text, int size, float height)
         {
             var rect = Element("Label", rows, typeof(Text), typeof(LayoutElement));
-            rect.GetComponent<LayoutElement>().preferredHeight = height;
+            rect.GetComponent<LayoutElement>().minHeight = height;
             var label = rect.GetComponent<Text>();
             label.font = font;
             label.fontSize = size;

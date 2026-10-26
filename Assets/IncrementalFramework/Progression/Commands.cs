@@ -26,8 +26,31 @@ namespace IncrementalFramework
         public ToggleProducerCommand(string producerId, bool enabled) { ProducerId = producerId; Enabled = enabled; }
     }
     public sealed class PrestigeCommand : ISimulationCommand { }
+    public sealed class ClickCommand : ISimulationCommand
+    {
+        public string ResourceId { get; }
+        public BigDouble BaseAmount { get; }
+        public ClickCommand(string resourceId, BigDouble baseAmount) { ResourceId = resourceId; BaseAmount = baseAmount; }
+    }
+    public sealed class SetFlagCommand : ISimulationCommand
+    {
+        public string FlagId { get; }
+        public bool Value { get; }
+        public SetFlagCommand(string flagId, bool value) { FlagId = flagId; Value = value; }
+    }
+    public sealed class SetModifierCommand : ISimulationCommand
+    {
+        public string ModifierId { get; }
+        public bool Enabled { get; }
+        public SetModifierCommand(string modifierId, bool enabled) { ModifierId = modifierId; Enabled = enabled; }
+    }
+    public sealed class TriggerRuleCommand : ISimulationCommand
+    {
+        public string RuleId { get; }
+        public TriggerRuleCommand(string ruleId) { RuleId = ruleId; }
+    }
 
-    public enum SimulationEventKind { Rule, GrantResource, BuyProducer, BuyUpgrade, ToggleProducer, Prestige }
+    public enum SimulationEventKind { Rule, GrantResource, BuyProducer, BuyUpgrade, ToggleProducer, Prestige, Click, SetFlag, SetModifier, TriggerRule }
 
     public sealed class SimulationEvent
     {

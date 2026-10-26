@@ -69,6 +69,24 @@ namespace IncrementalFrameworkTests
         }
 
         [Test]
+        public void AggregateRateExponentOverflowRejectsPurchaseAtomically()
+        {
+            var huge = BigDouble.FromMantissaExponentNoNormalize(6, long.MaxValue);
+            var content = new ContentDatabase(new[] { new ResourceDefinition("gold", 10), new ResourceDefinition("energy") },
+                new[] { new ProducerDefinition("first", Amount("gold", 1), new[] { new ResourceAmount("energy", huge) }),
+                    new ProducerDefinition("second", Amount("gold", 1), new[] { new ResourceAmount("energy", huge) }) });
+            var simulation = new Simulation(content);
+            Succeeds(simulation, new BuyProducerCommand("first"));
+            var before = simulation.ExportState();
+            Assert.That(simulation.Execute(new BuyProducerCommand("second")).Success, Is.False);
+            Balance(simulation, "gold", 9);
+            Assert.That(simulation.GetProducer("second").Owned, Is.Zero);
+            Assert.That(simulation.GetResource("energy").Rate.Mantissa, Is.EqualTo(huge.Mantissa));
+            Assert.That(simulation.GetResource("energy").Rate.Exponent, Is.EqualTo(huge.Exponent));
+            Assert.That(simulation.PendingEventCount, Is.EqualTo(before.Events.Count));
+        }
+
+        [Test]
         public void WriterThreadAffinityRejectsConcurrentMutation()
         {
             var simulation = new Simulation(WorkerContent());
@@ -139,7 +157,8 @@ namespace IncrementalFrameworkTests
             var after = simulation.ExportState();
             Assert.That(after.Events.Find(x => x.TargetId == "wood-rule").Sequence, Is.EqualTo(woodEvent.Sequence),
                 "Unrelated rate dependencies must not be invalidated or rescheduled.");
-            Assert.That(after.Events.Find(x => x.TargetId == "gold-rule").Sequence, Is.Not.EqualTo(goldEvent.Sequence));
+            Assert.That(after.Events.Find(x => x.TargetId == "wood-rule").Time, Is.EqualTo(woodEvent.Time));
+            Assert.That(after.Events.Find(x => x.TargetId == "gold-rule").Time, Is.LessThan(goldEvent.Time));
             Assert.That(simulation.GetResource("gold").Rate.ToDouble(), Is.EqualTo(6));
             Assert.That(simulation.GetResource("wood").Rate.ToDouble(), Is.EqualTo(7));
             Succeeds(simulation, new ToggleProducerCommand("miner", false));

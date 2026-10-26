@@ -11,7 +11,7 @@ namespace IncrementalFramework
 {
     public sealed class SimulationSnapshot
     {
-        public const int CurrentVersion = 2;
+        public const int CurrentVersion = 3;
         public int Version { get; set; } = CurrentVersion;
         public DateTime SavedAtUtc { get; set; }
         public string ContentVersion { get; set; }
@@ -44,6 +44,29 @@ namespace IncrementalFramework
             if (snapshot["state"] == null && snapshot["simulation"] != null)
                 snapshot["state"] = snapshot["simulation"].DeepClone();
             snapshot.Remove("simulation");
+            SnapshotService.AddLegacyLifetime(snapshot);
+            snapshot["version"] = ToVersion;
+            return snapshot;
+        }
+    }
+
+    /// <summary>Legacy saves did not fingerprint definitions; the caller explicitly supplies their original content.</summary>
+    public sealed class VersionTwoSnapshotMigration : ISnapshotMigration
+    {
+        private readonly string contentHash;
+        public int FromVersion => 2;
+        public int ToVersion => 3;
+        public VersionTwoSnapshotMigration(ContentDatabase legacyContent)
+        { contentHash = ContentFingerprint.Compute(legacyContent); }
+        public JObject Migrate(JObject snapshot)
+        {
+            if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
+            if ((snapshot["contentHash"] != null && snapshot.Value<string>("contentHash") != contentHash) ||
+                (snapshot["contentVersion"] != null && snapshot.Value<string>("contentVersion") != ContentFingerprint.CurrentVersion))
+                throw new JsonSerializationException("Legacy snapshot content fingerprint differs from the supplied definitions.");
+            snapshot["contentVersion"] = ContentFingerprint.CurrentVersion;
+            snapshot["contentHash"] = contentHash;
+            SnapshotService.AddLegacyLifetime(snapshot);
             snapshot["version"] = ToVersion;
             return snapshot;
         }
@@ -92,14 +115,20 @@ namespace IncrementalFramework
         public static Simulation Restore(ContentDatabase content, SimulationSnapshot snapshot, int eventBudget = 10000,
             ModuleBuilder modules = null)
         {
+            var simulation = RestoreCore(content, snapshot, eventBudget);
+            ValidateSections(modules?.SnapshotSections ?? Array.Empty<ISnapshotSection>(), snapshot.Sections);
+            if (modules != null) modules.Attach(simulation);
+            RestoreSections(simulation, snapshot.Sections);
+            return simulation;
+        }
+
+        private static Simulation RestoreCore(ContentDatabase content, SimulationSnapshot snapshot, int eventBudget)
+        {
             Validate(snapshot);
             if (snapshot.ContentVersion != ContentFingerprint.CurrentVersion ||
                 !string.Equals(snapshot.ContentHash, ContentFingerprint.Compute(content), StringComparison.Ordinal))
                 throw new InvalidOperationException("Snapshot content differs; an explicit content migration is required.");
-            var simulation = Simulation.FromState(content, snapshot.State, eventBudget);
-            if (modules != null) modules.Attach(simulation);
-            RestoreSections(simulation, snapshot.Sections);
-            return simulation;
+            return Simulation.FromState(content, snapshot.State, eventBudget);
         }
         public static string Serialize(SimulationSnapshot snapshot)
         {
@@ -145,6 +174,12 @@ namespace IncrementalFramework
                     var legacy = new VersionOneSnapshotMigration();
                     root = legacy.Migrate(root);
                     version = legacy.ToVersion;
+                }
+                else if (version == 2 && root["contentHash"] != null && root["contentVersion"] != null)
+                {
+                    // Fingerprinted version-two saves need only the new root schema version.
+                    AddLegacyLifetime(root);
+                    version = 3;
                 }
                 else throw new JsonSerializationException("No migration is available.");
                 root["version"] = version;
@@ -194,13 +229,19 @@ namespace IncrementalFramework
             try
             {
                 snapshot = Deserialize(ReadBounded(path), migrations);
-                simulation = Restore(content, snapshot, eventBudget, modules);
+                simulation = RestoreCore(content, snapshot, eventBudget);
+                ValidateSections(modules?.SnapshotSections ?? Array.Empty<ISnapshotSection>(), snapshot.Sections);
             }
-            catch (Exception error) when ((error is IOException || error is JsonException || error is ArgumentException || error is InvalidOperationException) && File.Exists(path + ".bak"))
+            catch (Exception error) when ((error is IOException || error is JsonException || error is ArgumentException ||
+                error is InvalidOperationException || error is FormatException || error is OverflowException ||
+                error is NotSupportedException) && File.Exists(path + ".bak"))
             {
                 snapshot = Deserialize(ReadBounded(path + ".bak"), migrations);
-                simulation = Restore(content, snapshot, eventBudget, modules);
+                simulation = RestoreCore(content, snapshot, eventBudget);
+                ValidateSections(modules?.SnapshotSections ?? Array.Empty<ISnapshotSection>(), snapshot.Sections);
             }
+            if (modules != null) modules.Attach(simulation);
+            RestoreSections(simulation, snapshot.Sections);
             AdvanceOffline(simulation, snapshot, utcNow, offlineCapSeconds);
             return simulation;
         }
@@ -232,9 +273,20 @@ namespace IncrementalFramework
 
         private static void RestoreSections(Simulation simulation, IReadOnlyList<SnapshotSectionData> saved)
         {
+            var registered = ValidateSections(simulation.SnapshotSections, saved);
+            foreach (var section in saved) registered[section.Id].Restore(section.Version, section.Data);
+        }
+
+        private static Dictionary<string, ISnapshotSection> ValidateSections(
+            IReadOnlyList<ISnapshotSection> sections, IReadOnlyList<SnapshotSectionData> saved)
+        {
             var registered = new Dictionary<string, ISnapshotSection>(StringComparer.Ordinal);
-            foreach (var section in simulation.SnapshotSections)
+            foreach (var section in sections)
+            {
+                if (section == null || string.IsNullOrWhiteSpace(section.Id) || section.Version < 1 || registered.ContainsKey(section.Id))
+                    throw new InvalidOperationException("Invalid or duplicate registered snapshot section.");
                 registered.Add(section.Id, section);
+            }
             if (registered.Count != saved.Count)
                 throw new InvalidOperationException("Snapshot module sections differ; all saved and registered sections are required.");
             foreach (var section in saved)
@@ -242,7 +294,7 @@ namespace IncrementalFramework
                     throw new InvalidOperationException("Unknown snapshot module section: " + section.Id);
             // No module is mutated until every section has passed its version/data validation.
             foreach (var section in saved) registered[section.Id].Validate(section.Version, section.Data);
-            foreach (var section in saved) registered[section.Id].Restore(section.Version, section.Data);
+            return registered;
         }
 
         private static OfflineResumeResult AdvanceOffline(Simulation simulation, SimulationSnapshot snapshot,
@@ -288,6 +340,14 @@ namespace IncrementalFramework
             try { return token.Value<int>(); }
             catch (Exception error) when (error is OverflowException || error is FormatException || error is InvalidCastException)
             { throw new JsonSerializationException("Invalid save version.", error); }
+        }
+
+        internal static void AddLegacyLifetime(JObject snapshot)
+        {
+            if (!(snapshot["state"] is JObject simulation) || !(simulation["resources"] is JArray resources)) return;
+            foreach (var resource in resources)
+                if (resource is JObject state && state["lifetimeEarned"] == null && state["balance"] != null)
+                    state["lifetimeEarned"] = state["balance"].DeepClone();
         }
 
         private static void RejectMetadata(JToken token)

@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   resources:
   - {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
+  - {fileID: 11400000, guid: b1000000000000000000000000000007, type: 2}
   producers:
   - {fileID: 11400000, guid: b1000000000000000000000000000002, type: 2}
   - {fileID: 11400000, guid: b1000000000000000000000000000003, type: 2}
@@ -21,9 +22,17 @@ MonoBehaviour:
   - {fileID: 11400000, guid: b1000000000000000000000000000004, type: 2}
   rules:
   - {fileID: 11400000, guid: b1000000000000000000000000000005, type: 2}
+  flags:
+  - {fileID: 11400000, guid: b1000000000000000000000000000008, type: 2}
   clickResource: {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
   clickAmount: 1
-  prestigeResource: {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
+  prestigeSourceResource: {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
+  prestigeMode: 1
+  prestigeRewardResource: {fileID: 11400000, guid: b1000000000000000000000000000007, type: 2}
   prestigeThreshold: 100
+  prestigeRewardExponent: 0.5
+  prestigeRewardMultiplier: 1
   prestigeProductionBonus: 0.1
+  prestigeResetProducers: 1
+  prestigeResetUpgrades: 1
   maximumOfflineSeconds: 28800

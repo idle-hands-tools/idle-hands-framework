@@ -18,17 +18,19 @@ namespace IncrementalFramework
         public bool Completed { get; }
         public double Time { get; }
         public int ProcessedEvents { get; }
-        public AdvanceResult(bool completed, double time, int processedEvents)
-        { Completed = completed; Time = time; ProcessedEvents = processedEvents; }
+        public int ProcessedWork { get; }
+        public AdvanceResult(bool completed, double time, int processedEvents, int processedWork = -1)
+        { Completed = completed; Time = time; ProcessedEvents = processedEvents; ProcessedWork = processedWork < 0 ? processedEvents : processedWork; }
     }
 
     public readonly struct EventToken : IEquatable<EventToken>
     {
         public long Value { get; }
-        public EventToken(long value) { Value = value; }
-        public bool Equals(EventToken other) => Value == other.Value;
+        public long Version { get; }
+        public EventToken(long value, long version = 1) { Value = value; Version = version; }
+        public bool Equals(EventToken other) => Value == other.Value && Version == other.Version;
         public override bool Equals(object obj) => obj is EventToken other && Equals(other);
-        public override int GetHashCode() => Value.GetHashCode();
+        public override int GetHashCode() => unchecked(Value.GetHashCode() * 397 ^ Version.GetHashCode());
     }
 
     public sealed class ScheduledEvent<T>
@@ -36,9 +38,10 @@ namespace IncrementalFramework
         public double Time { get; }
         public int Priority { get; }
         public long Sequence { get; }
-        public EventToken Token => new EventToken(Sequence);
+        public long Version { get; }
+        public EventToken Token => new EventToken(Sequence, Version);
         public T Payload { get; }
-        public ScheduledEvent(double time, int priority, long sequence, T payload)
-        { Time = time; Priority = priority; Sequence = sequence; Payload = payload; }
+        public ScheduledEvent(double time, int priority, long sequence, T payload, long version = 1)
+        { Time = time; Priority = priority; Sequence = sequence; Payload = payload; Version = version; }
     }
 }

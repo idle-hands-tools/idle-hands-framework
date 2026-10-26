@@ -73,6 +73,10 @@ Use one logical writer. Commands and event processing are synchronous; do not
 call the simulation concurrently or mutate it from notification callbacks.
 Stable content IDs are compiled into dense integer indexes. Reads of runtime
 resource state are indexed, and no producer MonoBehaviour computes economy.
+UTC resume time comes from `IClock`. RNG can be injected through `IRandomSource`;
+this save schema accepts the documented `xorshift64-13-7-17` algorithm, whose
+64-bit state is persisted. Give each simulation its own source and do not advance
+that source externally. The seed constructor uses the same replay algorithm.
 
 `AdvanceTo(targetSimulationTime)` rejects backwards time and integrates constant
 rates analytically. The binary min-heap orders events by
@@ -100,6 +104,12 @@ Independent enabled producers contribute cached rates. Resource and category
 modifier dependency indexes dirty only affected producer rates. Modifier order is
 **flat → summed additive percent → multiplicative → override**; additive
 percent values are fractions (`0.5` means +50%).
+The pipeline evaluates each producer/output's owned-count-scaled base rate.
+Override selection uses highest priority, then ordinal stable modifier ID.
+The permanent prestige multiplier is applied once after this pipeline.
+Flat and additive-percent debuffs may be negative; effective passive output is
+clamped nonnegative. Negative-rate consumption/decay processes are not implemented.
+One-time upgrades have fixed authored multi-resource prices, not upgrade levels.
 
 Rules subscribe to indexed dependencies, not a global per-frame scan. Conditions
 include resource/owned-count/upgrade/flag predicates and AND/OR/NOT; effects are
@@ -132,6 +142,25 @@ state, and snapshot-section contracts. Future modules can register data and
 behavior without a global mutable singleton. Resource-input processes and flow
 solvers are extension seams only: coupled production is not implemented.
 
+`IGameModule.Register(ModuleBuilder)` registers definitions, commands, systems,
+typed stores, and snapshot sections. `ModuleBuilder.Create()` compiles definitions
+and attaches registrations in order. A builder belongs to **one** simulation;
+restore with fresh module instances, not stores shared with another running game.
+Custom command handlers receive a read model and a `SimulationTransaction`;
+stage resource costs/grants and `DenseStateStore<T>` writes there. The simulation
+validates the entire transaction before committing. Register a versioned
+`ISnapshotSection` for module-owned persistent values. Systems schedule the
+built-in serializable command payloads before advancement; they are not
+per-producer Unity updates. Custom immediate handlers are registered explicitly;
+arbitrary command objects and delegates are never serialized.
+`IPrestigeResetParticipant` stages module reset/transform/recalculated values
+before prestige commits; Preserve participants are left untouched. Validation
+can veto the entire reset. Optional Unity adapters compose through
+`PresentationAdapters`, keeping presentation dependencies out of headless modules.
+For native balances/counts, Recalculate reinitializes from compiled content and
+rebuilds derived rates. Modules with their own derived state implement its formula
+in their reset participant; no arbitrary formulas or asset-supplied C# are loaded.
+
 Replay determinism means the same ordered inputs, seed, content, and tested
 runtime. Cross-platform bitwise floating-point determinism is not promised.
 Hot-path arrays, cached rates, indexed dependencies, and heap scheduling avoid
@@ -145,7 +174,27 @@ batch-buy optimization, Jobs/Burst, and DOTS.
 
 ## Implementation report
 
-Verification results and measured benchmark timings are recorded here after the
-implementation is exercised. The initial performance goal is under 100 ms for
-10,000 independent producers, 100 resources, and a 30-day analytical fast-forward;
-this is a profiling target, not a cross-machine guarantee.
+Implemented: analytical/event-boundary production, validated purchases and
+multi-resource transactions, modifiers, indexed unlocks/rules, prestige, exact
+versioned saves, capped/resumable offline catch-up, module composition, authoring
+assets, a saved demo scene, and automated test/benchmark projects.
+
+The standalone suite verifies large values, exact save round-trips, atomic failure,
+geometric prices, modifiers/invalidation, stable ordering/cancellation, caps,
+the explicit t=100 rate-change case, cascades, prestige/reset participation,
+seeded replay, migrations/backups, and analytical 24-hour catch-up.
+Runtime assemblies have built independently with C# 9/.NET Standard 2.1.
+**Unity Editor import and PlayMode tests have not been run:** no Editor is
+installed in the implementation sandbox. Use the Unity Test Runner before shipping.
+
+Measured reference run (2026-10-26): Ubuntu 24.04.5, .NET **8.0.31**, Intel Xeon
+Platinum 8573C, four available logical processors. For **10,000 owned producers,
+100 resources, 30 days**, three warmups and seven measured repetitions:
+advance min/median/mean/max **0.019933 / 0.021132 / 0.024383 / 0.036507 ms**,
+**0 allocated bytes** during advancement and **0 scheduled events**.
+All final balances and owned counts were checked. Compilation, fixture creation,
+and purchases are excluded from advancement timing and reported separately by the
+harness. These are measured cached-independent-production results on a virtual
+runner, not invented desktop numbers or a prediction for event-heavy games.
+The initial under-100-ms catch-up goal is a profiling target, not a cross-machine
+guarantee. Re-run the harness on your target hardware and Unity runtime.

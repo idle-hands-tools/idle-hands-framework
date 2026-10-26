@@ -14,5 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   id: cookies
   displayName: Cookies
+  category: currency
   startingAmount: 0
+  hasCap: 0
+  cap: 1000
+  negativePolicy: 0
+  numberFormat: 3
+  decimalPlaces: 2
+  useGrouping: 0
   resetOnPrestige: 1
+  usePrestigePolicy: 1
+  prestigePolicy: 0
+  prestigeTransform: 1

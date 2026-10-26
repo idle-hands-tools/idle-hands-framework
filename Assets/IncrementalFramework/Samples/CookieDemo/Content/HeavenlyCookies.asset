@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1000000000000000000000000000001, type: 3}
+  m_Name: HeavenlyCookies
+  m_EditorClassIdentifier:
+  id: heavenly-cookies
+  displayName: Heavenly Cookies
+  category: prestige
+  startingAmount: 0
+  hasCap: 0
+  cap: 1000
+  negativePolicy: 0
+  numberFormat: 0
+  decimalPlaces: 0
+  useGrouping: 1
+  resetOnPrestige: 0
+  usePrestigePolicy: 1
+  prestigePolicy: 1
+  prestigeTransform: 1

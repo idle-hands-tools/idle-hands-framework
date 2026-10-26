@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   id: oven
   displayName: Oven
+  category: bakery
   initiallyUnlocked: 1
   costs:
   - resource: {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
@@ -26,3 +27,6 @@ MonoBehaviour:
   - kind: 1
     targetId: cookies
     amount: 50
+  usePrestigePolicy: 0
+  prestigePolicy: 0
+  prestigeTransform: 1

@@ -7,12 +7,14 @@ namespace IncrementalFramework
     {
         private readonly Func<BigDouble> balance;
         private readonly Func<BigDouble> rate;
+        private readonly Func<BigDouble> lifetime;
         public string Id { get; }
         public BigDouble Balance => balance();
         public BigDouble Rate => rate();
+        public BigDouble LifetimeEarned => lifetime();
         public BigDouble? Cap { get; }
-        internal ResourceView(string id, BigDouble? cap, Func<BigDouble> balance, Func<BigDouble> rate)
-        { Id = id; Cap = cap; this.balance = balance; this.rate = rate; }
+        internal ResourceView(string id, BigDouble? cap, Func<BigDouble> balance, Func<BigDouble> rate, Func<BigDouble> lifetime)
+        { Id = id; Cap = cap; this.balance = balance; this.rate = rate; this.lifetime = lifetime; }
     }
     public sealed class ProducerView
     {

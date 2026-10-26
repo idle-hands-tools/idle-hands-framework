@@ -12,6 +12,8 @@ namespace IncrementalFramework
         private readonly EventScheduler<SimulationEvent> scheduler = new EventScheduler<SimulationEvent>();
         private readonly BigDouble[] balances;
         private readonly BigDouble[] rates;
+        private readonly BigDouble[] lifetime;
+        private readonly BigDouble[] lifetimeBuffer;
         private readonly BigDouble[] producerFactors;
         private readonly BigDouble[] integrationBuffer;
         private readonly long[] owned;
@@ -31,6 +33,7 @@ namespace IncrementalFramework
         public double Time { get; private set; }
         public double? PendingTarget => pendingTarget;
         public long PrestigeCount { get; private set; }
+        public BigDouble PrestigeCurrencyEarned { get; private set; }
         public BigDouble PermanentMultiplier { get; private set; } = BigDouble.One;
         public int PendingEventCount => scheduler.Count;
         public CommandResult LastEventResult { get; private set; } = CommandResult.Ok();
@@ -45,19 +48,24 @@ namespace IncrementalFramework
             EventBudget = eventBudget; randomState = seed == 0 ? 1 : seed;
             balances = new BigDouble[content.Resources.Count]; rates = new BigDouble[balances.Length];
             integrationBuffer = new BigDouble[balances.Length];
+            lifetime = new BigDouble[balances.Length]; lifetimeBuffer = new BigDouble[balances.Length];
             owned = new long[content.Producers.Count]; enabled = new bool[owned.Length];
             producerUnlocked = new bool[owned.Length]; producerFactors = new BigDouble[owned.Length];
             purchased = new bool[content.Upgrades.Count]; upgradeUnlocked = new bool[purchased.Length];
             ruleFired = new bool[content.Rules.Count]; ruleEligible = new double[ruleFired.Length]; ruleTokens = new EventToken[ruleFired.Length];
             ruleDisabled = new bool[ruleFired.Length];
+            ruleArmed = new bool[ruleFired.Length];
+            flags = new bool[content.Flags.Count];
+            activeModifiers = new bool[content.Modifiers.Count];
+            for (int i = 0; i < flags.Length; i++) flags[i] = content.Flags[i].Initial;
             var resourceViews = new ResourceView[balances.Length];
             var producerViews = new ProducerView[owned.Length];
             var upgradeViews = new UpgradeView[purchased.Length];
             for (int i = 0; i < balances.Length; i++)
             {
-                int index = i; balances[i] = content.Resources[i].Initial;
+                int index = i; balances[i] = content.Resources[i].Initial; lifetime[i] = balances[i];
                 resourceViews[i] = new ResourceView(content.Resources[i].Id, content.Resources[i].Cap,
-                    () => balances[index], () => EffectiveRate(index));
+                    () => balances[index], () => EffectiveRate(index), () => lifetime[index]);
             }
             for (int i = 0; i < owned.Length; i++)
             {
@@ -93,11 +101,23 @@ namespace IncrementalFramework
                 if (command is GrantResourceCommand grant)
                 {
                     int index = Content.ResourceIndex(grant.ResourceId);
-                    if (!Number.IsFinite(grant.Amount) || grant.Amount < BigDouble.Zero) return CommandResult.Fail("Grant must be finite and nonnegative.");
-                    BigDouble value = balances[index] + grant.Amount;
-                    if (!Number.IsFinite(value)) return CommandResult.Fail("Grant overflows.");
-                    balances[index] = Clamp(index, value); RefreshRules(index); return CommandResult.Ok();
+                    return Grant(index, grant.Amount);
                 }
+                if (command is ClickCommand click)
+                {
+                    int index = Content.ResourceIndex(click.ResourceId);
+                    if (!Number.IsFinite(click.BaseAmount) || click.BaseAmount < BigDouble.Zero) return CommandResult.Fail("Click amount must be finite and nonnegative.");
+                    return Grant(index, clickModifiers[index].Apply(click.BaseAmount));
+                }
+                if (command is SetFlagCommand flag)
+                {
+                    int index = Content.FlagIndex(flag.FlagId); bool changed = flags[index] != flag.Value; flags[index] = flag.Value;
+                    foreach (int rule in Content.RulesForFlag(index)) RefreshRule(rule);
+                    if (changed) NotifyTrigger(RuleTriggerKind.FlagChanged, index);
+                    return CommandResult.Ok();
+                }
+                if (command is SetModifierCommand modifier) return SetModifier(Content.ModifierIndex(modifier.ModifierId), modifier.Enabled);
+                if (command is TriggerRuleCommand triggerRule) return TriggerManualRule(triggerRule.RuleId);
                 if (command is BuyProducerCommand buy) return BuyProducer(Content.ProducerIndex(buy.ProducerId), buy.Count);
                 if (command is BuyUpgradeCommand upgrade) return BuyUpgrade(Content.UpgradeIndex(upgrade.UpgradeId));
                 if (command is ToggleProducerCommand toggle)
@@ -114,6 +134,7 @@ namespace IncrementalFramework
                 return CommandResult.Fail("Unknown command.");
             }
             catch (ArgumentException error) { return CommandResult.Fail(error.Message); }
+            catch (ArithmeticException error) { return CommandResult.Fail(error.Message); }
         }
 
         public IReadOnlyList<ResourceAmount> GetProducerCost(string id, int count = 1)
@@ -124,7 +145,7 @@ namespace IncrementalFramework
             var result = new List<ResourceAmount>();
             BigDouble scale = CostScale(index, count);
             foreach (var cost in Content.ProducerCosts(index))
-                result.Add(new ResourceAmount(Content.Resources[cost.ResourceIndex].Id, cost.Amount * scale));
+                result.Add(new ResourceAmount(Content.Resources[cost.ResourceIndex].Id, Number.Multiply(cost.Amount, scale)));
             return result.AsReadOnly();
         }
 
@@ -137,6 +158,20 @@ namespace IncrementalFramework
             {
                 Number.NonNegative(grant.Amount, nameof(command));
                 payload = new SimulationEvent(SimulationEventKind.GrantResource, Content.ResourceIndex(grant.ResourceId), grant.Amount);
+            }
+            else if (command is ClickCommand click)
+            {
+                Number.NonNegative(click.BaseAmount, nameof(command));
+                payload = new SimulationEvent(SimulationEventKind.Click, Content.ResourceIndex(click.ResourceId), click.BaseAmount);
+            }
+            else if (command is SetFlagCommand flag)
+                payload = new SimulationEvent(SimulationEventKind.SetFlag, Content.FlagIndex(flag.FlagId), enabled: flag.Value);
+            else if (command is SetModifierCommand modifier)
+                payload = new SimulationEvent(SimulationEventKind.SetModifier, Content.ModifierIndex(modifier.ModifierId), enabled: modifier.Enabled);
+            else if (command is TriggerRuleCommand triggerRule)
+            {
+                if (!ruleIndices.TryGetValue(triggerRule.RuleId ?? "", out int rule)) throw new ArgumentException("Unknown rule id.");
+                payload = new SimulationEvent(SimulationEventKind.TriggerRule, rule);
             }
             else if (command is BuyProducerCommand buy)
             {
@@ -157,29 +192,59 @@ namespace IncrementalFramework
             if (scheduler.TryGet(token, out var entry) && entry.Payload.Kind == SimulationEventKind.Rule) return false;
             return scheduler.Cancel(token);
         }
+        public EventToken Reschedule(EventToken token, double time, int priority = 0)
+        {
+            AssertWriter();
+            if (!Finite(time) || time < Time) throw new ArgumentOutOfRangeException(nameof(time));
+            if (!scheduler.TryGet(token, out var entry) || entry.Payload.Kind == SimulationEventKind.Rule)
+                throw new ArgumentException("Unknown, stale, or engine-owned event token.", nameof(token));
+            return scheduler.Reschedule(token, time, priority, entry.Payload);
+        }
 
         public AdvanceResult AdvanceTo(double target)
         {
             AssertWriter();
             if (!Finite(target) || target < Time || (pendingTarget.HasValue && target < pendingTarget.Value))
                 throw new ArgumentOutOfRangeException(nameof(target), "Time must be finite and monotonic, including a pending target.");
-            if (!pendingTarget.HasValue) PrepareSystems(target);
-            pendingTarget = target;
-            int processed = 0;
-            while (scheduler.TryPeek(out var entry) && entry.Time <= target)
+            if (!pendingTarget.HasValue)
             {
-                if (processed == EventBudget) return new AdvanceResult(false, Time, processed);
-                Integrate(entry.Time);
-                scheduler.TryDequeue(out entry); processed++;
-                Process(entry);
+                PrepareSystems(target);
+                systemsPreparedTarget = target;
             }
-            Integrate(target); pendingTarget = null;
-            return new AdvanceResult(true, Time, processed);
+            pendingTarget = target;
+            int processed = 0, work = 0;
+            while (true)
+            {
+                double horizon = systemsPreparedTarget ?? target;
+                while (true)
+                {
+                    if (scheduler.NextStoredTime.HasValue && scheduler.NextStoredTime.Value > horizon) break;
+                    work += scheduler.PruneCancelled(EventBudget - work);
+                    if (scheduler.HasCancelledHead)
+                    {
+                        if (scheduler.NextStoredTime.Value > horizon) break;
+                        return new AdvanceResult(false, Time, processed, work);
+                    }
+                    if (!scheduler.TryPeek(out var entry) || entry.Time > horizon) break;
+                    if (work == EventBudget) return new AdvanceResult(false, Time, processed, work);
+                    Integrate(entry.Time);
+                    scheduler.TryDequeue(out entry); processed++; work++;
+                    Process(entry);
+                }
+                Integrate(horizon);
+                if (horizon == target) break;
+                // Finish the already-prepared interval before extending systems using its final state.
+                PrepareSystems(target);
+                systemsPreparedTarget = target;
+            }
+            pendingTarget = null; systemsPreparedTarget = null;
+            return new AdvanceResult(true, Time, processed, work);
         }
 
         public ulong NextRandomUInt64()
         {
             AssertWriter();
+            if (injectedRandom != null) return NextInjectedRandom();
             ulong value = randomState;
             value ^= value << 13; value ^= value >> 7; value ^= value << 17;
             randomState = value; return value;
@@ -189,6 +254,7 @@ namespace IncrementalFramework
         {
             if (count < 1 || owned[index] > long.MaxValue - count) return CommandResult.Fail("Invalid producer count.");
             if (!producerUnlocked[index]) return CommandResult.Fail("Producer is locked.");
+            if (!EvaluateCondition(Content.ProducerPrerequisiteCondition(index), Time)) return CommandResult.Fail("Producer prerequisites are not met.");
             BigDouble scale = CostScale(index, count);
             if (!CanPay(Content.ProducerCosts(index), scale)) return CommandResult.Fail("Insufficient resources or invalid cost.");
             // Validate every cost and all affected rates before mutating any state.
@@ -197,13 +263,15 @@ namespace IncrementalFramework
             Pay(Content.ProducerCosts(index), scale);
             owned[index] += count; RefreshProducer(index);
             foreach (var cost in Content.ProducerCosts(index)) RefreshRules(cost.ResourceIndex);
+            foreach (int rule in Content.RulesForProducer(index)) RefreshRule(rule);
+            NotifyTrigger(RuleTriggerKind.ProducerPurchased, index);
             return CommandResult.Ok();
         }
 
         private BigDouble CostScale(int index, int count)
         {
             double growth = Content.Producers[index].CostGrowth;
-            BigDouble start = BigDouble.Pow(new BigDouble(growth), owned[index]);
+            BigDouble start = Number.Pow(new BigDouble(growth), owned[index]);
             if (growth == 1) return new BigDouble(count);
             // Binary composition avoids catastrophic cancellation in (growth^count - 1)/(growth - 1).
             BigDouble sum = BigDouble.Zero, power = BigDouble.One;
@@ -211,27 +279,49 @@ namespace IncrementalFramework
             int remaining = count;
             while (remaining > 0)
             {
-                if ((remaining & 1) != 0) { sum += power * blockSum; power *= blockPower; }
+                if ((remaining & 1) != 0)
+                {
+                    sum = Number.Add(sum, Number.Multiply(power, blockSum));
+                    if (remaining > 1) power = Number.Multiply(power, blockPower);
+                }
                 remaining >>= 1;
-                if (remaining > 0) { blockSum *= BigDouble.One + blockPower; blockPower *= blockPower; }
+                if (remaining > 0) { blockSum = Number.Multiply(blockSum, Number.Add(BigDouble.One, blockPower)); blockPower = Number.Multiply(blockPower, blockPower); }
             }
-            return start * sum;
+            return Number.Multiply(start, sum);
         }
 
         private CommandResult BuyUpgrade(int index)
         {
             if (!upgradeUnlocked[index]) return CommandResult.Fail("Upgrade is locked.");
+            if (!EvaluateCondition(Content.UpgradePrerequisiteCondition(index), Time)) return CommandResult.Fail("Upgrade prerequisites are not met.");
             if (purchased[index]) return CommandResult.Fail("Upgrade is already purchased.");
             if (!CanPay(Content.UpgradeCosts(index), BigDouble.One)) return CommandResult.Fail("Insufficient resources.");
             var targets = new SortedSet<int>();
-            foreach (var modifier in Content.UpgradeModifiers(index)) targets.Add(modifier.ProducerIndex);
+            foreach (int producer in Content.AffectedProducers(index)) targets.Add(producer);
             var projected = new Dictionary<int, BigDouble>();
+            var projectedModifiers = new Dictionary<int, StatModifiers[]>();
             foreach (int target in targets) projected.Add(target, Factor(target, owned[target], enabled[target], index));
-            if (!ValidProjectedRates(projected)) return CommandResult.Fail("Production overflows.");
+            foreach (int target in targets) projectedModifiers.Add(target, BuildOutputModifiers(target, index));
+            var clickTargets = new SortedSet<int>();
+            foreach (var modifier in Content.UpgradeModifiers(index))
+            {
+                if (modifier.Target == ModifierTarget.Click)
+                {
+                    if (modifier.TargetIndex >= 0) clickTargets.Add(modifier.TargetIndex);
+                    else for (int r = 0; r < balances.Length; r++) clickTargets.Add(r);
+                }
+            }
+            if (!ValidProjectedRates(projected, projectedModifiers)) return CommandResult.Fail("Production overflows.");
+            foreach (int resource in clickTargets)
+                BuildClickModifiers(resource, index).Apply(BigDouble.One);
             Pay(Content.UpgradeCosts(index), BigDouble.One);
             purchased[index] = true;
+            foreach (var pair in projectedModifiers) outputModifiers[pair.Key] = pair.Value;
+            foreach (int resource in clickTargets) clickModifiers[resource] = BuildClickModifiers(resource);
             RefreshProducers(targets);
             foreach (var cost in Content.UpgradeCosts(index)) RefreshRules(cost.ResourceIndex);
+            foreach (int rule in Content.RulesForUpgrade(index)) RefreshRule(rule);
+            NotifyTrigger(RuleTriggerKind.UpgradePurchased, index);
             return CommandResult.Ok();
         }
 
@@ -240,7 +330,7 @@ namespace IncrementalFramework
             if (!Number.IsFinite(scale) || scale < BigDouble.Zero) return false;
             foreach (var cost in costs)
             {
-                BigDouble value = cost.Amount * scale;
+                BigDouble value = Number.Multiply(cost.Amount, scale);
                 if (!Number.IsFinite(value) || value > balances[cost.ResourceIndex]) return false;
             }
             return true;
@@ -248,75 +338,122 @@ namespace IncrementalFramework
 
         private void Pay(IReadOnlyList<IndexedAmount> costs, BigDouble scale)
         {
-            foreach (var cost in costs) balances[cost.ResourceIndex] -= cost.Amount * scale;
+            foreach (var cost in costs) balances[cost.ResourceIndex] = Number.AddSigned(balances[cost.ResourceIndex], -Number.Multiply(cost.Amount, scale));
         }
 
+        private CommandResult Grant(int index, BigDouble amount)
+        {
+            if (!Number.IsFinite(amount) || amount < BigDouble.Zero) return CommandResult.Fail("Grant must be finite and nonnegative.");
+            BigDouble value = GrantedBalance(index, balances[index], amount);
+            BigDouble earned = Number.Add(lifetime[index], Number.AddSigned(value, -balances[index]));
+            if (!Number.IsFinite(value) || !Number.IsFinite(earned)) return CommandResult.Fail("Grant overflows.");
+            balances[index] = value; lifetime[index] = earned; RefreshRules(index); return CommandResult.Ok();
+        }
+
+        private BigDouble RequirementValue(IndexedRequirement requirement)
+        {
+            switch (requirement.Kind)
+            {
+                case RequirementKind.Resource: return balances[requirement.TargetIndex];
+                case RequirementKind.LifetimeResource: return lifetime[requirement.TargetIndex];
+                case RequirementKind.Producer: return new BigDouble(owned[requirement.TargetIndex]);
+                case RequirementKind.Upgrade: return purchased[requirement.TargetIndex] ? BigDouble.One : BigDouble.Zero;
+                case RequirementKind.Prestige: return new BigDouble(PrestigeCount);
+                default: throw new InvalidOperationException("Unknown requirement.");
+            }
+        }
         private CommandResult Prestige()
         {
             var definition = Content.Prestige;
             if (definition == null) return CommandResult.Fail("Prestige is not configured.");
-            if (balances[Content.ResourceIndex(definition.ResourceId)] < definition.Threshold) return CommandResult.Fail("Prestige threshold not reached.");
-            BigDouble multiplier = PermanentMultiplier * definition.MultiplierPerPrestige;
+            BigDouble reward = BigDouble.Zero;
+            BigDouble earnedCurrency = PrestigeCurrencyEarned;
+            BigDouble rewardBalance = BigDouble.Zero, rewardLifetime = BigDouble.Zero;
+            int rewardIndex = -1;
+            BigDouble multiplier;
+            if (definition.UsesLifetimeReward)
+            {
+                reward = GetPrestigeReward();
+                if (reward <= BigDouble.Zero) return CommandResult.Fail("No unclaimed lifetime prestige reward.");
+                rewardIndex = Content.ResourceIndex(definition.RewardResourceId);
+                rewardBalance = GrantedBalance(rewardIndex, balances[rewardIndex], reward);
+                if (rewardBalance - balances[rewardIndex] < reward) return CommandResult.Fail("Prestige currency cap prevents the full reward.");
+                rewardLifetime = Number.Add(lifetime[rewardIndex], reward);
+                earnedCurrency = Number.Add(PrestigeCurrencyEarned, reward);
+                multiplier = Number.Add(BigDouble.One, Number.Multiply(earnedCurrency, definition.ProductionBonusPerReward));
+            }
+            else
+            {
+                if (balances[Content.ResourceIndex(definition.ResourceId)] < definition.Threshold) return CommandResult.Fail("Prestige threshold not reached.");
+                multiplier = Number.Multiply(PermanentMultiplier, definition.MultiplierPerPrestige);
+            }
             if (PrestigeCount == long.MaxValue || !Number.IsFinite(multiplier)) return CommandResult.Fail("Prestige overflows.");
+            var resetBalances = (BigDouble[])balances.Clone();
+            var resetLifetime = (BigDouble[])lifetime.Clone();
+            for (int r = 0; r < balances.Length; r++)
+            {
+                if (r == rewardIndex) { resetBalances[r] = rewardBalance; resetLifetime[r] = rewardLifetime; continue; }
+                var resource = Content.Resources[r];
+                switch (resource.PrestigePolicy)
+                {
+                    case ResetPolicy.Reset:
+                    case ResetPolicy.Recalculate: resetBalances[r] = resource.Initial; break;
+                    case ResetPolicy.Transform: resetBalances[r] = Clamp(r, Number.Multiply(balances[r], resource.PrestigeTransform)); break;
+                }
+                if (resource.PrestigePolicy == ResetPolicy.Transform && resetBalances[r] > balances[r])
+                    resetLifetime[r] = Number.Add(lifetime[r], resetBalances[r] - balances[r]);
+            }
             var projected = new Dictionary<int, BigDouble>();
+            var projectedModifiers = new Dictionary<int, StatModifiers[]>();
+            var resetModifierState = new bool[activeModifiers.Length];
             for (int i = 0; i < owned.Length; i++)
             {
-                long count = definition.ResetProducers ? 0 : owned[i];
-                BigDouble additive = BigDouble.Zero, product = BigDouble.One;
-                foreach (int upgrade in Content.UpgradesForProducer(i))
-                {
-                    if (!purchased[upgrade] || (definition.ResetUpgrades && !Content.Upgrades[upgrade].Permanent)) continue;
-                    foreach (var modifier in Content.UpgradeModifiers(upgrade))
-                        if (modifier.ProducerIndex == i)
-                        {
-                            if (modifier.Kind == ModifierKind.Add) additive += modifier.Value;
-                            else product *= modifier.Value;
-                        }
-                }
-                projected.Add(i, !enabled[i] || count == 0 ? BigDouble.Zero : new BigDouble(count) * (BigDouble.One + additive) * product * multiplier);
+                long count = ResetProducerCount(i, definition);
+                bool resetState = ProducerResetPolicy(i, definition) == ResetPolicy.Reset || ProducerResetPolicy(i, definition) == ResetPolicy.Recalculate;
+                projected.Add(i, (!enabled[i] && !resetState) || count == 0 ? BigDouble.Zero : new BigDouble(count));
+                projectedModifiers[i] = BuildOutputModifiers(i, prestigeReset: definition.ResetUpgrades, modifierState: resetModifierState);
             }
-            if (!ValidProjectedRates(projected)) return CommandResult.Fail("Prestige production overflows.");
+            for (int r = 0; r < balances.Length; r++)
+                BuildClickModifiers(r, prestigeReset: definition.ResetUpgrades, modifierState: resetModifierState).Apply(BigDouble.One);
+            if (!ValidProjectedRates(projected, projectedModifiers, multiplier)) return CommandResult.Fail("Prestige production overflows.");
+            var moduleReset = PrepareModuleReset(out var moduleResetTransaction);
+            if (!moduleReset.Success) return moduleReset;
             PermanentMultiplier = multiplier; PrestigeCount++;
-            for (int i = 0; i < balances.Length; i++)
-                if (Content.Resources[i].ResetOnPrestige) balances[i] = Content.Resources[i].Initial;
-            if (definition.ResetProducers)
-                for (int i = 0; i < owned.Length; i++)
-                { owned[i] = 0; enabled[i] = true; producerUnlocked[i] = Content.Producers[i].InitiallyUnlocked; }
+            PrestigeCurrencyEarned = earnedCurrency;
+            Array.Copy(resetBalances, balances, balances.Length); Array.Copy(resetLifetime, lifetime, lifetime.Length);
+            for (int i = 0; i < owned.Length; i++)
+            {
+                owned[i] = ResetProducerCount(i, definition);
+                var policy = ProducerResetPolicy(i, definition);
+                if (policy == ResetPolicy.Reset || policy == ResetPolicy.Recalculate)
+                { enabled[i] = true; producerUnlocked[i] = Content.Producers[i].InitiallyUnlocked; }
+            }
             if (definition.ResetUpgrades)
                 for (int i = 0; i < purchased.Length; i++)
                     if (!Content.Upgrades[i].Permanent)
                     { purchased[i] = false; upgradeUnlocked[i] = Content.Upgrades[i].InitiallyUnlocked; }
             for (int i = 0; i < ruleFired.Length; i++)
-                if (Content.Rules[i].ResetOnPrestige) { ruleFired[i] = false; ruleDisabled[i] = false; ruleEligible[i] = Time; }
-            RebuildAllRates(); RefreshAllRules(); return CommandResult.Ok();
+                if (Content.Rules[i].ResetOnPrestige) { ruleFired[i] = false; ruleDisabled[i] = false; ruleArmed[i] = false; ruleEligible[i] = Time; }
+            for (int i = 0; i < flags.Length; i++) if (Content.Flags[i].ResetOnPrestige) flags[i] = Content.Flags[i].Initial;
+            Array.Clear(activeModifiers, 0, activeModifiers.Length);
+            moduleResetTransaction.Commit();
+            RebuildAllRates(); RefreshAllRules(); NotifyTrigger(RuleTriggerKind.Prestige); return CommandResult.Ok();
         }
 
         private BigDouble Factor(int index, long count, bool active, int includeUpgrade = -1)
         {
-            if (!active || count == 0) return BigDouble.Zero;
-            BigDouble additive = BigDouble.Zero, multiplier = BigDouble.One;
-            foreach (int upgrade in Content.UpgradesForProducer(index))
-            {
-                if (!purchased[upgrade] && upgrade != includeUpgrade) continue;
-                foreach (var modifier in Content.UpgradeModifiers(upgrade))
-                {
-                    if (modifier.ProducerIndex != index) continue;
-                    if (modifier.Kind == ModifierKind.Add) additive += modifier.Value;
-                    else multiplier *= modifier.Value;
-                }
-            }
-            return new BigDouble(count) * (BigDouble.One + additive) * multiplier * PermanentMultiplier;
+            return !active || count == 0 ? BigDouble.Zero : new BigDouble(count);
         }
 
         private bool ValidFactor(int index, BigDouble factor)
         {
             if (!Number.IsFinite(factor)) return false;
             foreach (var output in Content.ProducerOutputs(index))
-                if (!Number.IsFinite(output.Amount * factor)) return false;
+                if (!Number.IsFinite(Number.Multiply(output.Amount, factor))) return false;
             return true;
         }
 
-        private bool ValidProjectedRates(Dictionary<int, BigDouble> projected)
+        private bool ValidProjectedRates(Dictionary<int, BigDouble> projected, Dictionary<int, StatModifiers[]> projectedModifiers = null, BigDouble? permanent = null)
         {
             var affected = new HashSet<int>();
             foreach (var pair in projected)
@@ -331,7 +468,7 @@ namespace IncrementalFramework
                 {
                     BigDouble factor = projected.TryGetValue(producer, out var replacement) ? replacement : producerFactors[producer];
                     foreach (var output in Content.ProducerOutputs(producer))
-                        if (output.ResourceIndex == resource) total += output.Amount * factor;
+                        if (output.ResourceIndex == resource) total = Number.Add(total, Contribution(producer, resource, output.Amount, factor, projectedModifiers, permanent));
                 }
                 if (!Number.IsFinite(total)) return false;
             }
@@ -362,12 +499,13 @@ namespace IncrementalFramework
             BigDouble rate = BigDouble.Zero;
             foreach (int producer in Content.ProducersForResource(resource))
                 foreach (var output in Content.ProducerOutputs(producer))
-                    if (output.ResourceIndex == resource) rate += output.Amount * producerFactors[producer];
+                    if (output.ResourceIndex == resource) rate = Number.Add(rate, Contribution(producer, resource, output.Amount, producerFactors[producer]));
             if (!Number.IsFinite(rate)) throw new InvalidOperationException("Production rate overflows.");
             rates[resource] = rate;
         }
         private void RebuildAllRates()
         {
+            RebuildAllModifierCaches();
             for (int i = 0; i < owned.Length; i++) producerFactors[i] = Factor(i, owned[i], enabled[i]);
             for (int i = 0; i < rates.Length; i++) RebuildRate(i);
         }
@@ -381,6 +519,11 @@ namespace IncrementalFramework
             var cap = Content.Resources[index].Cap;
             return cap.HasValue && value > cap.Value ? cap.Value : value;
         }
+        private BigDouble GrantedBalance(int index, BigDouble balance, BigDouble amount)
+        {
+            var cap = Content.Resources[index].Cap;
+            return cap.HasValue && amount >= Number.AddSigned(cap.Value, -balance) ? cap.Value : Number.Add(balance, amount);
+        }
         private void Integrate(double time)
         {
             double elapsed = time - Time;
@@ -389,12 +532,17 @@ namespace IncrementalFramework
             {
                 for (int i = 0; i < balances.Length; i++)
                 {
-                    BigDouble value = balances[i] + rates[i] * elapsed;
-                    value = Clamp(i, value);
-                    if (!Number.IsFinite(value)) throw new InvalidOperationException("Resource integration overflows.");
+                    BigDouble produced;
+                    try { produced = Number.Multiply(rates[i], new BigDouble(elapsed)); }
+                    catch (ArithmeticException) when (Content.Resources[i].Cap.HasValue) { produced = Content.Resources[i].Cap.Value; }
+                    BigDouble value = GrantedBalance(i, balances[i], produced);
+                    BigDouble earned = Number.Add(lifetime[i], Number.AddSigned(value, -balances[i]));
+                    if (!Number.IsFinite(value) || !Number.IsFinite(earned)) throw new InvalidOperationException("Resource integration overflows.");
                     integrationBuffer[i] = value;
+                    lifetimeBuffer[i] = earned;
                 }
                 Array.Copy(integrationBuffer, balances, balances.Length);
+                Array.Copy(lifetimeBuffer, lifetime, lifetime.Length);
             }
             Time = time;
         }
@@ -408,7 +556,11 @@ namespace IncrementalFramework
             bool hasDueTime = TryRuleTime(index, out double due);
             // Preserve the sequence of an already-correct event. Requeuing it would starve
             // later same-time rules when a zero-cooldown repeat changes the shared resource.
-            if (hasDueTime && scheduler.TryGet(ruleTokens[index], out var current) && current.Time == due) return;
+            if (hasDueTime && scheduler.TryGet(ruleTokens[index], out var current))
+            {
+                if (current.Time != due) ruleTokens[index] = scheduler.Reschedule(current.Token, due, 100, current.Payload);
+                return;
+            }
             scheduler.Cancel(ruleTokens[index]); ruleTokens[index] = default;
             if (hasDueTime) ruleTokens[index] = scheduler.Schedule(due, 100, new SimulationEvent(SimulationEventKind.Rule, index));
         }
@@ -417,60 +569,26 @@ namespace IncrementalFramework
             due = 0;
             var rule = Content.Rules[index];
             if (ruleDisabled[index] || (ruleFired[index] && !rule.Repeat)) return false;
-            int resource = Content.RuleResource(index);
-            var cap = Content.Resources[resource].Cap;
-            if (cap.HasValue && rule.Threshold > cap.Value) return false;
-            due = Math.Max(Time, ruleEligible[index]);
-            if (balances[resource] < rule.Threshold)
-            {
-                if (rates[resource] <= BigDouble.Zero) return false;
-                double delta = ((rule.Threshold - balances[resource]) / rates[resource]).ToDouble();
-                if (!Finite(delta)) return false;
-                double crossing = Time + delta;
-                if (crossing <= Time) crossing = NextTime(Time);
-                due = Math.Max(due, crossing);
-            }
-            return Finite(due);
+            if (!ContinuousTrigger(rule.Trigger.Kind) && !ruleArmed[index]) return false;
+            return TryConditionTime(index, out due);
         }
         private void Process(ScheduledEvent<SimulationEvent> entry)
+        {
+            try { ProcessEvent(entry); }
+            catch (ArithmeticException error)
+            {
+                LastEventResult = CommandResult.Fail(error.Message);
+                if (entry.Payload.Kind == SimulationEventKind.Rule)
+                { ruleFired[entry.Payload.Index] = true; ruleDisabled[entry.Payload.Index] = true; }
+            }
+        }
+        private void ProcessEvent(ScheduledEvent<SimulationEvent> entry)
         {
             var payload = entry.Payload;
             switch (payload.Kind)
             {
                 case SimulationEventKind.Rule:
-                    int index = payload.Index; ruleTokens[index] = default;
-                    var rule = Content.Rules[index];
-                    if (balances[Content.RuleResource(index)] < rule.Threshold)
-                    { RefreshRule(index); return; }
-                    var grants = new SortedDictionary<int, BigDouble>();
-                    foreach (var action in Content.RuleActions(index))
-                        if (action.Kind == RuleActionKind.GrantResource)
-                        {
-                            int resource = action.TargetIndex;
-                            BigDouble value = grants.TryGetValue(resource, out var previous) ? previous : balances[resource];
-                            value = Clamp(resource, value + action.Amount);
-                            if (!Number.IsFinite(value))
-                            {
-                                LastEventResult = CommandResult.Fail("Rule resource transaction overflows.");
-                                ruleFired[index] = true; ruleDisabled[index] = true;
-                                return;
-                            }
-                            grants[resource] = value;
-                        }
-                    ruleFired[index] = true;
-                    double nextEligible = Time + rule.Cooldown;
-                    if (rule.Cooldown > 0 && nextEligible <= Time) nextEligible = NextTime(Time);
-                    // No finite instant remains after this cooldown. Persist a disabled rule, not Infinity.
-                    if (!Finite(nextEligible)) { ruleDisabled[index] = true; nextEligible = Time; }
-                    ruleEligible[index] = nextEligible;
-                    foreach (var grant in grants) balances[grant.Key] = grant.Value;
-                    foreach (var action in Content.RuleActions(index))
-                    {
-                        if (action.Kind == RuleActionKind.UnlockProducer) producerUnlocked[action.TargetIndex] = true;
-                        else if (action.Kind == RuleActionKind.UnlockUpgrade) upgradeUnlocked[action.TargetIndex] = true;
-                    }
-                    foreach (var grant in grants) RefreshRules(grant.Key);
-                    RefreshRule(index); LastEventResult = CommandResult.Ok(); break;
+                    ProcessRule(payload.Index); break;
                 case SimulationEventKind.GrantResource:
                     LastEventResult = ExecuteInternal(new GrantResourceCommand(Content.Resources[payload.Index].Id, payload.Amount)); break;
                 case SimulationEventKind.BuyProducer:
@@ -480,6 +598,14 @@ namespace IncrementalFramework
                 case SimulationEventKind.ToggleProducer:
                     LastEventResult = ExecuteInternal(new ToggleProducerCommand(Content.Producers[payload.Index].Id, payload.Enabled)); break;
                 case SimulationEventKind.Prestige: LastEventResult = ExecuteInternal(new PrestigeCommand()); break;
+                case SimulationEventKind.Click:
+                    LastEventResult = ExecuteInternal(new ClickCommand(Content.Resources[payload.Index].Id, payload.Amount)); break;
+                case SimulationEventKind.SetFlag:
+                    LastEventResult = ExecuteInternal(new SetFlagCommand(Content.Flags[payload.Index].Id, payload.Enabled)); break;
+                case SimulationEventKind.SetModifier:
+                    LastEventResult = ExecuteInternal(new SetModifierCommand(Content.Modifiers[payload.Index].Id, payload.Enabled)); break;
+                case SimulationEventKind.TriggerRule:
+                    LastEventResult = ExecuteInternal(new TriggerRuleCommand(Content.Rules[payload.Index].Id)); break;
                 default: throw new InvalidOperationException("Unknown event kind.");
             }
         }

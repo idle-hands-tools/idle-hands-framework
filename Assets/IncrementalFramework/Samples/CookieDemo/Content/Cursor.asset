@@ -14,6 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   id: cursor
   displayName: Cursor
+  category: bakery
   initiallyUnlocked: 1
   costs:
   - resource: {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
@@ -23,3 +24,6 @@ MonoBehaviour:
   - resource: {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
     amount: 1
   prerequisites: []
+  usePrestigePolicy: 0
+  prestigePolicy: 0
+  prestigeTransform: 1

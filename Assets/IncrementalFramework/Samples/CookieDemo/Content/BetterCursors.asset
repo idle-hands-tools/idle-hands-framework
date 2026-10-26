@@ -24,6 +24,8 @@ MonoBehaviour:
     targetId: cursor
     amount: 1
   modifiers:
-  - producerId: cursor
-    additive: 0
+  - scope: 0
+    targetId: cursor
+    kind: 2
+    priority: 0
     value: 2

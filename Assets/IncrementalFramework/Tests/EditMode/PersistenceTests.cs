@@ -25,6 +25,8 @@ namespace IncrementalFrameworkTests
             {
                 snapshot["state"]["resources"][0]["balance"] =
                     new JObject { ["mantissa"] = 7.0, ["exponent"] = 0 };
+                snapshot["state"]["resources"][0]["lifetimeEarned"] =
+                    new JObject { ["mantissa"] = 7.0, ["exponent"] = 0 };
                 return snapshot;
             }
         }
@@ -105,6 +107,34 @@ namespace IncrementalFrameworkTests
         }
 
         [Test]
+        public void SnapshotRestoresSpentLifetimePermanentUpgradeAndDisabledProducer()
+        {
+            var content = new ContentDatabase(new[] { new ResourceDefinition("gold", 100) },
+                new[] { new ProducerDefinition("worker", new[] { new ResourceAmount("gold", 20) },
+                    new[] { new ResourceAmount("gold", 2) }) },
+                new[] { new UpgradeDefinition("upgrade", new[] { new ResourceAmount("gold", 5) },
+                    new[] { new ModifierDefinition("permanent", "worker", 3) }, permanent: true) });
+            var original = new Simulation(content, 789);
+            original.Execute(new BuyProducerCommand("worker"));
+            original.Execute(new BuyUpgradeCommand("upgrade"));
+            original.Execute(new ToggleProducerCommand("worker", false));
+            original.Schedule(new ToggleProducerCommand("worker", true), 100);
+            original.AdvanceTo(50);
+            var json = StateJson(original);
+            var restored = SnapshotService.Restore(content, SnapshotService.Deserialize(json));
+            Assert.That(StateJson(restored), Is.EqualTo(json));
+            Assert.That(restored.GetResource("gold").Balance.ToDouble(), Is.EqualTo(75));
+            Assert.That(restored.GetResource("gold").LifetimeEarned.ToDouble(), Is.EqualTo(100));
+            Assert.That(restored.GetUpgrade("upgrade").Purchased, Is.True);
+            Assert.That(restored.GetProducer("worker").Enabled, Is.False);
+            original.AdvanceTo(200);
+            restored.AdvanceTo(200);
+            Assert.That(StateJson(restored), Is.EqualTo(StateJson(original)));
+            Assert.That(restored.GetResource("gold").Balance.ToDouble(), Is.EqualTo(675));
+            Assert.That(restored.GetResource("gold").LifetimeEarned.ToDouble(), Is.EqualTo(700));
+        }
+
+        [Test]
         public void ExportedStateAndRestoredStateAreDetachedCopies()
         {
             var simulation = new Simulation(Content());
@@ -155,6 +185,62 @@ namespace IncrementalFrameworkTests
         }
 
         [Test]
+        public void ZeroCooldownCascadeSnapshotRetainsExactQueuedSequenceOnBudgetResume()
+        {
+            var content = new ContentDatabase(new[] { new ResourceDefinition("gold") },
+                rules: new[] { new RuleDefinition("repeat", "gold", 0,
+                    new RuleAction[] { new GrantResourceAction("gold", 1) }, repeat: true) });
+            var original = new Simulation(content, eventBudget: 3);
+            Assert.That(original.AdvanceTo(100).Completed, Is.False);
+            var saved = StateJson(original);
+            var restored = SnapshotService.Restore(content, SnapshotService.Deserialize(saved), eventBudget: 3);
+            Assert.That(StateJson(restored), Is.EqualTo(saved));
+            Assert.That(restored.ExportState().Events[0].Sequence, Is.EqualTo(original.ExportState().Events[0].Sequence));
+            for (int i = 0; i < 3; i++)
+            {
+                Assert.That(original.AdvanceTo(100).Completed, Is.False);
+                Assert.That(restored.AdvanceTo(100).Completed, Is.False);
+                Assert.That(StateJson(restored), Is.EqualTo(StateJson(original)));
+            }
+            Assert.That(restored.GetResource("gold").Balance.ToDouble(), Is.EqualTo(12));
+            Assert.That(restored.Time, Is.Zero);
+            Assert.That(restored.PendingEventCount, Is.EqualTo(1));
+        }
+
+        [TestCase(1e20)]
+        [TestCase(double.MaxValue)]
+        public void PositiveCooldownAtHugeTimeNeverAccidentallyRepeatsAtSameTimestamp(double time)
+        {
+            var content = new ContentDatabase(new[] { new ResourceDefinition("gold") },
+                rules: new[] { new RuleDefinition("repeat", "gold", 0,
+                    new RuleAction[] { new GrantResourceAction("gold", 1) }, repeat: true, cooldown: 1) });
+            var initial = new Simulation(content);
+            var state = initial.ExportState();
+            state.Time = time;
+            state.Events[0].Time = time;
+            var simulation = Simulation.FromState(content, state, eventBudget: 3);
+            var result = simulation.AdvanceTo(time);
+            Assert.That(result.Completed, Is.True);
+            Assert.That(result.ProcessedEvents, Is.EqualTo(1));
+            Assert.That(simulation.GetResource("gold").Balance.ToDouble(), Is.EqualTo(1));
+            var after = simulation.ExportState();
+            if (time == double.MaxValue)
+            {
+                Assert.That(after.Events, Is.Empty);
+                Assert.That(after.Rules[0].Disabled, Is.True);
+            }
+            else
+            {
+                Assert.That(after.Events.Count, Is.EqualTo(1));
+                Assert.That(after.Events[0].Time, Is.GreaterThan(time));
+            }
+            var json = StateJson(simulation);
+            var restored = SnapshotService.Restore(content, SnapshotService.Deserialize(json));
+            Assert.That(StateJson(restored), Is.EqualTo(json));
+            Assert.That(restored.AdvanceTo(time).ProcessedEvents, Is.Zero);
+        }
+
+        [Test]
         public void VersionOneSnapshotMigratesAndFutureVersionIsRejected()
         {
             var simulation = new Simulation(Content());
@@ -167,6 +253,44 @@ namespace IncrementalFrameworkTests
             Assert.That(StateJson(SnapshotService.Restore(simulation.Content, migrated)), Is.EqualTo(StateJson(simulation)));
             json["version"] = 999;
             Assert.Throws<JsonSerializationException>(() => SnapshotService.Deserialize(json.ToString()));
+        }
+
+        [TestCase(1)]
+        [TestCase(2)]
+        public void HistoricalSnapshotsWithoutFingerprintRequireExplicitLegacyContentMigration(int version)
+        {
+            var content = Content();
+            var original = new Simulation(content);
+            original.Execute(new GrantResourceCommand("gold", 10));
+            original.Execute(new BuyProducerCommand("worker"));
+            var root = JObject.Parse(StateJson(original));
+            root["version"] = version;
+            root.Remove("contentHash");
+            root.Remove("contentVersion");
+            foreach (var resource in (JArray)root["state"]["resources"])
+                ((JObject)resource).Remove("lifetimeEarned");
+            if (version == 1)
+            {
+                root["simulation"] = root["state"];
+                root.Remove("state");
+            }
+            var legacyJson = root.ToString();
+            Assert.Throws<JsonSerializationException>(() => SnapshotService.Deserialize(legacyJson));
+            var migrated = SnapshotService.Deserialize(legacyJson, new[] { new VersionTwoSnapshotMigration(content) });
+            Assert.That(migrated.Version, Is.EqualTo(SimulationSnapshot.CurrentVersion));
+            Assert.That(StateJson(SnapshotService.Restore(content, migrated)), Is.EqualTo(StateJson(original)));
+        }
+
+        [TestCase("contentHash")]
+        [TestCase("contentVersion")]
+        public void ExplicitLegacyMigrationCannotOverrideExistingMismatchedFingerprint(string property)
+        {
+            var content = Content();
+            var root = JObject.Parse(StateJson(new Simulation(content)));
+            root["version"] = 2;
+            root[property] = property == "contentHash" ? new string('0', 64) : "different-version";
+            Assert.Throws<JsonSerializationException>(() => SnapshotService.Deserialize(
+                root.ToString(), new[] { new VersionTwoSnapshotMigration(content) }));
         }
 
         [Test]
@@ -256,8 +380,9 @@ namespace IncrementalFrameworkTests
         public void DeserializeRejectsDuplicatePropertiesAndTrailingDocuments()
         {
             var json = StateJson(new Simulation(Content()));
+            var version = "\"version\": " + SimulationSnapshot.CurrentVersion;
             Assert.Throws<JsonReaderException>(() =>
-                SnapshotService.Deserialize(json.Replace("\"version\": 2", "\"version\": 2, \"version\": 2")));
+                SnapshotService.Deserialize(json.Replace(version, version + ", " + version)));
             Assert.Throws<JsonReaderException>(() => SnapshotService.Deserialize(json + "{}"));
         }
 
@@ -288,6 +413,79 @@ namespace IncrementalFrameworkTests
                 new[] { new RuleDefinition("rule", "gold", changed == "threshold" ? 11 : 10,
                     new RuleAction[] { new GrantResourceAction("gems", changed == "action" ? 2 : 1) }) },
                 new PrestigeDefinition("gold", 100, changed == "prestige" ? 3 : 2));
+
+        [TestCase("resources")]
+        [TestCase("producers")]
+        [TestCase("upgrades")]
+        [TestCase("rules")]
+        public void FingerprintPreservesDefinitionArrayOrderAndRejectsImplicitReordering(string reordered)
+        {
+            var original = new Simulation(OrderedContent(null));
+            var snapshot = SnapshotService.Capture(original, Epoch);
+            var changed = OrderedContent(reordered);
+            Assert.That(ContentFingerprint.Compute(changed), Is.Not.EqualTo(snapshot.ContentHash));
+            Assert.Throws<InvalidOperationException>(() => SnapshotService.Restore(changed, snapshot));
+        }
+
+        private static ContentDatabase OrderedContent(string reordered)
+        {
+            var resources = new[] { new ResourceDefinition("gold"), new ResourceDefinition("gems") };
+            var producers = new[] {
+                new ProducerDefinition("miner", null, new[] { new ResourceAmount("gold", 1) }),
+                new ProducerDefinition("jeweler", null, new[] { new ResourceAmount("gems", 2) }) };
+            var upgrades = new[] {
+                new UpgradeDefinition("pick", null, new[] { new ModifierDefinition("pick-m", "miner", 2) }),
+                new UpgradeDefinition("lens", null, new[] { new ModifierDefinition("lens-m", "jeweler", 3) }) };
+            var rules = new[] {
+                new RuleDefinition("gold-rule", "gold", 10, new RuleAction[] { new GrantResourceAction("gems", 1) }),
+                new RuleDefinition("gems-rule", "gems", 20, new RuleAction[] { new GrantResourceAction("gold", 2) }) };
+            if (reordered == "resources") Array.Reverse(resources);
+            if (reordered == "producers") Array.Reverse(producers);
+            if (reordered == "upgrades") Array.Reverse(upgrades);
+            if (reordered == "rules") Array.Reverse(rules);
+            return new ContentDatabase(resources, producers, upgrades, rules);
+        }
+
+        [TestCase("grant-vs-spend")]
+        [TestCase("grant-amount")]
+        [TestCase("spend-amount")]
+        [TestCase("set-flag")]
+        [TestCase("schedule-delay")]
+        [TestCase("schedule-priority")]
+        [TestCase("set-modifier")]
+        [TestCase("flag-initial")]
+        [TestCase("flag-condition")]
+        [TestCase("modifier-priority")]
+        [TestCase("modifier-category")]
+        public void AdvancedRuleAndModifierFingerprintIncludesDiscriminatorsAndEveryPayload(string changed)
+        {
+            var baseline = AdvancedFingerprintContent(null);
+            var altered = AdvancedFingerprintContent(changed);
+            var snapshot = SnapshotService.Capture(new Simulation(baseline), Epoch);
+            Assert.That(ContentFingerprint.Compute(altered), Is.Not.EqualTo(snapshot.ContentHash));
+            Assert.Throws<InvalidOperationException>(() => SnapshotService.Restore(altered, snapshot));
+        }
+
+        private static ContentDatabase AdvancedFingerprintContent(string changed)
+        {
+            RuleAction first = changed == "grant-vs-spend"
+                ? (RuleAction)new SpendResourceAction("gold", 1)
+                : new GrantResourceAction("gold", changed == "grant-amount" ? 2 : 1);
+            var actions = new[] { first,
+                new SpendResourceAction("gold", changed == "spend-amount" ? 2 : 1),
+                new SetFlagAction("ready", changed != "set-flag"),
+                new ScheduleGrantResourceAction("gold", 2, changed == "schedule-delay" ? 6 : 5,
+                    changed == "schedule-priority" ? 2 : 1),
+                new SetModifierAction("dynamic", changed != "set-modifier") };
+            return new ContentDatabase(new[] { new ResourceDefinition("gold", 10, category: "ore"),
+                    new ResourceDefinition("wood", category: "forest") },
+                new[] { new ProducerDefinition("worker", null, new[] { new ResourceAmount("gold", 1), new ResourceAmount("wood", 1) }) },
+                rules: new[] { new RuleDefinition("rule", ConditionDefinition.Flag("ready", changed != "flag-condition"), actions) },
+                flags: new[] { new FlagDefinition("ready", changed == "flag-initial") },
+                modifiers: new[] { new ModifierDefinition("dynamic", ModifierTarget.ResourceCategoryProduction,
+                    changed == "modifier-category" ? "forest" : "ore", 2, ModifierKind.Override,
+                    changed == "modifier-priority" ? 2 : 1) });
+        }
 
         [Test]
         public void ClockRollbackEarnsNothingAndOfflineGainRespectsResourceCap()
@@ -347,7 +545,7 @@ namespace IncrementalFrameworkTests
             var json = JObject.Parse(StateJson(new Simulation(content)));
             json["version"] = 1;
             var migrated = SnapshotService.Deserialize(json.ToString(), new[] { new GoldMigration() });
-            Assert.That(migrated.Version, Is.EqualTo(2));
+            Assert.That(migrated.Version, Is.EqualTo(SimulationSnapshot.CurrentVersion));
             var restored = SnapshotService.Restore(content, migrated);
             Assert.That(restored.GetResource("gold").Balance.ToDouble(), Is.EqualTo(7));
             Assert.That(json["state"]["resources"][0]["balance"]["mantissa"].Value<double>(), Is.Zero);
@@ -375,6 +573,58 @@ namespace IncrementalFrameworkTests
             var json = JObject.Parse(SnapshotService.Serialize(snapshot));
             json["savedAtUtc"] = "2026-01-01T00:00:00";
             Assert.Throws<ArgumentException>(() => SnapshotService.Deserialize(json.ToString()));
+        }
+
+        [TestCase("json")]
+        [TestCase("utf8")]
+        [TestCase("header")]
+        public void ReadSnapshotFallsBackToBackupForMalformedMainFile(string corruption)
+        {
+            var directory = "snapshot-test-" + Guid.NewGuid().ToString("N");
+            var path = Path.Combine(directory, "save.json");
+            try
+            {
+                var simulation = new Simulation(Content());
+                simulation.Execute(new BuyProducerCommand("worker"));
+                SnapshotService.Save(path, simulation, Epoch);
+                var expected = StateJson(simulation);
+                simulation.Execute(new GrantResourceCommand("gems", 10));
+                SnapshotService.Save(path, simulation, Epoch);
+                if (corruption == "json") File.WriteAllText(path, "{broken");
+                else if (corruption == "utf8") File.WriteAllBytes(path, new byte[] { 0xc3, 0x28 });
+                else
+                {
+                    var json = JObject.Parse(File.ReadAllText(path));
+                    json["version"] = 999;
+                    File.WriteAllText(path, json.ToString());
+                }
+                var snapshot = SnapshotService.ReadSnapshot(path);
+                Assert.That(SnapshotService.Serialize(snapshot), Is.EqualTo(expected));
+                Assert.That(Directory.GetFiles(directory, "*.pending-*"), Is.Empty);
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
+        }
+
+        [Test]
+        public void ReadSnapshotRejectsOversizedSparseFileWithoutBackup()
+        {
+            var directory = "snapshot-test-" + Guid.NewGuid().ToString("N");
+            var path = Path.Combine(directory, "oversized.json");
+            try
+            {
+                Directory.CreateDirectory(directory);
+                using (var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write))
+                    stream.SetLength((long)SnapshotService.MaximumSnapshotBytes + 1);
+                Assert.That(File.Exists(path + ".bak"), Is.False);
+                Assert.Throws<JsonSerializationException>(() => SnapshotService.ReadSnapshot(path));
+            }
+            finally
+            {
+                if (Directory.Exists(directory)) Directory.Delete(directory, true);
+            }
         }
     }
 }

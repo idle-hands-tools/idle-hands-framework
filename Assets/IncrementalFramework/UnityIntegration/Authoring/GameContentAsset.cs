@@ -2,6 +2,8 @@ using UnityEngine;
 
 namespace IdleHands.UnityIntegration
 {
+    public enum PrestigeMode { BalanceMultiplier, LifetimeCurrency }
+
     [CreateAssetMenu(menuName = "Idle Hands/Game Content")]
     public sealed class GameContentAsset : ScriptableObject
     {
@@ -9,11 +11,22 @@ namespace IdleHands.UnityIntegration
         public ProducerAsset[] producers = new ProducerAsset[0];
         public UpgradeAsset[] upgrades = new UpgradeAsset[0];
         public RuleAsset[] rules = new RuleAsset[0];
+        public FlagAsset[] flags = new FlagAsset[0];
         public ResourceAsset clickResource;
         public string clickAmount = "1";
-        public ResourceAsset prestigeResource;
+        public PrestigeMode prestigeMode = PrestigeMode.LifetimeCurrency;
+        [Tooltip("Eligibility source: current balance in BalanceMultiplier mode, lifetime earnings in LifetimeCurrency mode.")]
+        [UnityEngine.Serialization.FormerlySerializedAs("prestigeResource")]
+        public ResourceAsset prestigeSourceResource;
+        [Tooltip("Separate persistent currency awarded in LifetimeCurrency mode.")]
+        public ResourceAsset prestigeRewardResource;
         public string prestigeThreshold = "100";
+        public double prestigeRewardExponent = 0.5;
+        public string prestigeRewardMultiplier = "1";
+        [Tooltip("Per-earned-currency production bonus in lifetime mode; per-reset bonus in legacy balance mode.")]
         public string prestigeProductionBonus = "0.1";
+        public bool prestigeResetProducers = true;
+        public bool prestigeResetUpgrades = true;
         [Min(0)] public float maximumOfflineSeconds = 28800;
 
         [ContextMenu("Validate Content")]

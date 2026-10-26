@@ -14,16 +14,24 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   id: bakery
   displayName: Bakery established (reward 50 cookies)
+  triggerKind: 4
+  triggerTargetId: oven
+  triggerTime: 0
   triggerResource: {fileID: 11400000, guid: b1000000000000000000000000000001, type: 2}
   threshold: 0
   conditions:
   - kind: 2
     targetId: oven
     amount: 1
+  booleanNodes: []
+  rootConditionIndex: -1
   actions:
   - kind: 0
     targetId: cookies
     amount: 50
+  - kind: 4
+    targetId: bakery-announced
+    flagValue: 1
   repeat: 0
   cooldownSeconds: 0
   resetOnPrestige: 1
