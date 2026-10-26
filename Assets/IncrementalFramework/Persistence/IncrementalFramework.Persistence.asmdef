@@ -1,0 +1,7 @@
+{
+  "name": "IncrementalFramework.Persistence",
+  "rootNamespace": "IncrementalFramework",
+  "references": ["IncrementalFramework.Core", "IncrementalFramework.Economy", "IncrementalFramework.Progression", "BreakInfinity", "Unity.Newtonsoft.Json"],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}

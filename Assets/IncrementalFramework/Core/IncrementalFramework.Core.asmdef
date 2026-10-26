@@ -1,0 +1,7 @@
+{
+  "name": "IncrementalFramework.Core",
+  "rootNamespace": "IncrementalFramework",
+  "references": [],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}

@@ -1,0 +1,7 @@
+{
+  "name": "IncrementalFramework.Progression",
+  "rootNamespace": "IncrementalFramework",
+  "references": ["IncrementalFramework.Core", "IncrementalFramework.Economy", "BreakInfinity"],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}

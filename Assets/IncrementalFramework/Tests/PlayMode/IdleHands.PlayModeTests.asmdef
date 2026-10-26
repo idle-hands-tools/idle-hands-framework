@@ -1,0 +1,6 @@
+{
+  "name": "IdleHands.PlayModeTests",
+  "references": ["IdleHands.UnityIntegration", "IncrementalFramework.Core", "IncrementalFramework.Economy", "IncrementalFramework.Progression", "BreakInfinity", "UnityEngine.UI"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}

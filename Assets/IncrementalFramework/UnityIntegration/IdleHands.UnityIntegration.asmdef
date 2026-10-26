@@ -1,0 +1,13 @@
+{
+  "name": "IdleHands.UnityIntegration",
+  "rootNamespace": "IdleHands.UnityIntegration",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "IncrementalFramework.Persistence",
+    "BreakInfinity",
+    "UnityEngine.UI"
+  ],
+  "autoReferenced": true
+}

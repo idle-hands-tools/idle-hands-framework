@@ -44,6 +44,7 @@
 ExportedObj/
 .consulo/
 *.csproj
+!Tools/**/*.csproj
 *.unityproj
 *.sln
 *.slnx
@@ -107,3 +108,8 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Standalone verification projects
+**/bin/
+**/obj/
+**/TestResults/
