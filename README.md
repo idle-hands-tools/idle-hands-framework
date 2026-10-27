@@ -184,15 +184,15 @@ geometric prices, modifiers/invalidation, stable ordering/cancellation, caps,
 the explicit t=100 rate-change case, cascades, prestige/reset participation,
 seeded replay, migrations/backups, and analytical 24-hour catch-up.
 Runtime assemblies have built independently with C# 9/.NET Standard 2.1.
-The completed headless contract suite passed **200 tests** with no failures.
+The completed headless contract suite passed **202 tests** with no failures.
 **Unity Editor import and PlayMode tests have not been run:** no Editor is
 installed in the implementation sandbox. Use the Unity Test Runner before shipping.
 
-Measured reference run (2026-10-26): Ubuntu 24.04.5, .NET **8.0.31**, Intel Xeon
-Platinum 8573C, four available logical processors. For **10,000 owned producers,
-100 resources, 30 days**, three warmups and seven measured repetitions:
-advance min/median/mean/max **0.065376 / 0.088335 / 0.089017 / 0.126184 ms**,
-**64,320 allocated bytes** during advancement and **0 scheduled events**.
+Measured reference run (2026-10-27): Ubuntu 24.04.5, .NET **8.0.31**, AMD EPYC
+9V74, four available logical processors. For **10,000 owned producers, 100
+resources, 30 days**, three warmups and seven measured repetitions: advance
+min/median/mean/max **0.036373 / 0.037636 / 0.042974 / 0.053969 ms**,
+**0 allocated bytes** during advancement and **0 scheduled events**.
 All final balances and owned counts were checked. Compilation, fixture creation,
 and purchases are excluded from advancement timing and reported separately by the
 harness. These are measured cached-independent-production results on a virtual
