@@ -1,0 +1,132 @@
+{
+  "owner": "thisisnozaku",
+  "default_visibility": "draft",
+  "projects": [
+    {
+      "scene": "OrbitalFoundry",
+      "title": "Orbital Foundry",
+      "slug": "orbital-foundry",
+      "tagline": "Build an orbital factory and assemble your way home.",
+      "classification": "game",
+      "kind": "html",
+      "visibility": "draft",
+      "pricing": "free",
+      "embed_width": 1280,
+      "embed_height": 900,
+      "fullscreen": true,
+      "tags": [
+        "incremental",
+        "management",
+        "sci-fi"
+      ],
+      "description_html": "<p>Turn raw ore into plates, wiring, circuits, and spacecraft components. Allocate machines, change recipes, and resolve production bottlenecks as you rebuild a stranded ship.</p><ul><li>Start with mining and smelting, then build specialized machines.</li><li>Balance shared inputs and storage; active batches finish before recipe changes apply.</li><li>Deliver the hull, avionics, and drive to launch.</li><li>Replay with an alternate blueprint and permanent production efficiency.</li></ul><p>Single-player framework sample. Use the in-game Save and Load controls. Saves are local to this browser; clearing site data removes progress.</p><p>Offline progress is capped at eight hours.</p>",
+      "archive": "Builds/OrbitalFoundry-itch.zip",
+      "butler_target": "thisisnozaku/orbital-foundry:html5"
+    },
+    {
+      "scene": "LastlightRailway",
+      "title": "Lastlight Railway",
+      "slug": "lastlight-railway",
+      "tagline": "Reconnect isolated settlements with a railway of your own.",
+      "classification": "game",
+      "kind": "html",
+      "visibility": "draft",
+      "pricing": "free",
+      "embed_width": 1280,
+      "embed_height": 900,
+      "fullscreen": true,
+      "tags": [
+        "incremental",
+        "management",
+        "trains"
+      ],
+      "description_html": "<p>Build a small railway network, configure train itineraries, and move supplies between settlements. Cargo belongs to each station, so delivering it is as important as producing it.</p><ul><li>Build track links and configure cyclic train itineraries.</li><li>Set loading limits and choose where cargo unloads.</li><li>Fulfill delivery contracts and reopen the mountain observatory.</li><li>Replay with a different contract order and demand quantities.</li></ul><p>Single-player framework sample. Use the in-game Save and Load controls. Saves are local to this browser; clearing site data removes progress.</p><p>Offline progress is capped at eight hours.</p>",
+      "archive": "Builds/LastlightRailway-itch.zip",
+      "butler_target": "thisisnozaku/lastlight-railway:html5"
+    },
+    {
+      "scene": "MarshlightReserve",
+      "title": "Marshlight Reserve",
+      "slug": "marshlight-reserve",
+      "tagline": "Restore a wetland by balancing habitats and its food web.",
+      "classification": "game",
+      "kind": "html",
+      "visibility": "draft",
+      "pricing": "free",
+      "embed_width": 1280,
+      "embed_height": 900,
+      "fullscreen": true,
+      "tags": [
+        "simulation",
+        "management",
+        "nature"
+      ],
+      "description_html": "<p>Bring a damaged wetland back to life. Improve water, purity, and shelter, establish vegetation and herbivores, then introduce predators when the habitat can support them.</p><ul><li>Restore three habitat zones with a coupled four-species food web.</li><li>Observe population trends and respond with habitat interventions.</li><li>Recover from local extinctions through reintroduction.</li><li>Maintain healthy populations for five simulated minutes to complete the reserve.</li></ul><p>Single-player framework sample. Use the in-game Save and Load controls. Saves are local to this browser; clearing site data removes progress.</p><p>Offline progress is capped at eight hours.</p>",
+      "archive": "Builds/MarshlightReserve-itch.zip",
+      "butler_target": "thisisnozaku/marshlight-reserve:html5"
+    },
+    {
+      "scene": "ThirteenthBell",
+      "title": "The Thirteenth Bell",
+      "slug": "the-thirteenth-bell",
+      "tagline": "Solve a clockwork mystery across repeating twelve-minute days.",
+      "classification": "game",
+      "kind": "html",
+      "visibility": "draft",
+      "pricing": "free",
+      "embed_width": 1280,
+      "embed_height": 900,
+      "fullscreen": true,
+      "tags": [
+        "interactive-fiction",
+        "mystery",
+        "time-travel"
+      ],
+      "description_html": "<p>At the thirteenth bell, the town returns to morning. Your memory survives. Investigate overlapping appointments, gather evidence, and find a safe way to release the town from its repeating day.</p><ul><li>Investigate four locations and five witnesses.</li><li>Plan around appointment windows and limited time.</li><li>Retain knowledge and discover faster investigation routes across loops.</li><li>Find three endings, including the complete release of the town.</li></ul><p>Single-player framework sample. Use the in-game Save and Load controls. Saves are local to this browser; clearing site data removes progress.</p><p>Investigations pause at decisions and loop boundaries. Offline absence never selects a response or starts another loop.</p>",
+      "archive": "Builds/ThirteenthBell-itch.zip",
+      "butler_target": "thisisnozaku/the-thirteenth-bell:html5"
+    },
+    {
+      "scene": "TideboundExchange",
+      "title": "Tidebound Exchange",
+      "slug": "tidebound-exchange",
+      "tagline": "Trade your way from a harbor warehouse to a thriving exchange.",
+      "classification": "game",
+      "kind": "html",
+      "visibility": "draft",
+      "pricing": "free",
+      "embed_width": 1280,
+      "embed_height": 900,
+      "fullscreen": true,
+      "tags": [
+        "simulation",
+        "management",
+        "trading"
+      ],
+      "description_html": "<p>Buy cargo, watch supply-sensitive prices, and fulfill civic contracts. Your own trades move the market, while warehouse capacity and standing orders shape what opportunities you can take.</p><ul><li>Trade four commodities across three unlockable markets.</li><li>Preview trade totals including price impact and spread.</li><li>Configure storage allocations and buy/sell limit orders.</li><li>Supply the lighthouse through a forty-minute season of civic delivery windows.</li></ul><p>Single-player framework sample. Use the in-game Save and Load controls. Saves are local to this browser; clearing site data removes progress.</p><p>Offline progress is capped at eight hours.</p>",
+      "archive": "Builds/TideboundExchange-itch.zip",
+      "butler_target": "thisisnozaku/tidebound-exchange:html5"
+    },
+    {
+      "scene": "Floodwall",
+      "title": "Letters from the Floodwall",
+      "slug": "letters-from-the-floodwall",
+      "tagline": "Every reply shapes a city’s evacuation before the river rises.",
+      "classification": "game",
+      "kind": "html",
+      "visibility": "draft",
+      "pricing": "free",
+      "embed_width": 1280,
+      "embed_height": 900,
+      "fullscreen": true,
+      "tags": [
+        "interactive-fiction",
+        "choices-matter",
+        "story-rich"
+      ],
+      "description_html": "<p>As an emergency correspondence officer, read conflicting reports, decide whom to trust, and send replies that shape a city’s response to an approaching flood. A coordinated plan depends on the promises you make and the people who believe you.</p><ul><li>Read a three-chapter story with five correspondents and twelve evidence entries.</li><li>Explore distinct council and neighborhood routes.</li><li>Search correspondence, follow evidence references, and track unresolved promises.</li><li>Reach four endings and replay from chapter checkpoints.</li></ul><p>Single-player framework sample. Use the in-game Save and Load controls. Saves are local to this browser; clearing site data removes progress.</p><p>Reading and choices wait for you. Adjustable text size, high-contrast display, and chapter replay are available in-game.</p>",
+      "archive": "Builds/Floodwall-itch.zip",
+      "butler_target": "thisisnozaku/letters-from-the-floodwall:html5"
+    }
+  ]
+}

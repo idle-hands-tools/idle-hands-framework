@@ -1,0 +1,10 @@
+{
+  "name": "IncrementalFramework.Samples.Expanded",
+  "references": [
+    "IncrementalFramework.Features",
+    "BreakInfinity",
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Progression"
+  ],
+  "noEngineReferences": true
+}

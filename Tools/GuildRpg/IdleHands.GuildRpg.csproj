@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>IncrementalFramework.Games.Rpg</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Persistence/IncrementalFramework.Persistence.csproj" />
+    <ProjectReference Include="../Combat/IncrementalFramework.Combat.csproj" />
+    <Compile Include="../../Assets/IncrementalFramework/Games/Rpg/**/*.cs" />
+  </ItemGroup>
+</Project>

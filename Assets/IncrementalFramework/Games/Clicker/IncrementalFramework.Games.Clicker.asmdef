@@ -1,0 +1,13 @@
+{
+  "name": "IncrementalFramework.Games.Clicker",
+  "rootNamespace": "IncrementalFramework.Games.Clicker",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Definitions",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "BreakInfinity"
+  ],
+  "noEngineReferences": true,
+  "autoReferenced": true
+}

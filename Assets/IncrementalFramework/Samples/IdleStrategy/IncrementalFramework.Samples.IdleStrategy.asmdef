@@ -1,0 +1,15 @@
+{
+  "name": "IncrementalFramework.Samples.IdleStrategy",
+  "rootNamespace": "IncrementalFramework.Samples.IdleStrategy",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Definitions",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "BreakInfinity",
+    "IncrementalFramework.Unity",
+    "IncrementalFramework.Games.Strategy",
+    "IncrementalFramework.Unity.Strategy"
+  ],
+  "autoReferenced": true
+}

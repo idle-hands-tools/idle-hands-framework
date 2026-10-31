@@ -1,0 +1,228 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 470b3bec02467d50eaa6a60dbf2329be, type: 3}
+  m_Name: Floodwall
+  m_EditorClassIdentifier: IncrementalFramework.Unity.Expanded::IncrementalFramework.Unity.Expanded.StoryAsset
+  Data: '{"Id":"floodwall-v1","Title":"Letters from the Floodwall","Start":"appointment","Variables":[{"Id":"preparedness","Kind":1,"Initial":{"Boolean":false,"Integer":0,"Members":[]},"SurvivesLoop":false},{"Id":"trust","Kind":1,"Initial":{"Boolean":false,"Integer":1,"Members":[]},"SurvivesLoop":false},{"Id":"mayor","Kind":1,"Initial":{"Boolean":false,"Integer":0,"Members":[]},"SurvivesLoop":false},{"Id":"engineer","Kind":1,"Initial":{"Boolean":false,"Integer":0,"Members":[]},"SurvivesLoop":false},{"Id":"ferryman","Kind":1,"Initial":{"Boolean":false,"Integer":0,"Members":[]},"SurvivesLoop":false},{"Id":"doctor","Kind":1,"Initial":{"Boolean":false,"Integer":0,"Members":[]},"SurvivesLoop":false},{"Id":"journalist","Kind":1,"Initial":{"Boolean":false,"Integer":0,"Members":[]},"SurvivesLoop":false},{"Id":"facts","Kind":2,"Initial":{"Boolean":false,"Integer":0,"Members":[]},"SurvivesLoop":false},{"Id":"promises","Kind":2,"Initial":{"Boolean":false,"Integer":0,"Members":[]},"SurvivesLoop":false},{"Id":"kept","Kind":2,"Initial":{"Boolean":false,"Integer":0,"Members":[]},"SurvivesLoop":false},{"Id":"published","Kind":0,"Initial":{"Boolean":false,"Integer":0,"Members":[]},"SurvivesLoop":false}],"Nodes":[{"Id":"appointment","Kind":0,"Chapter":1,"Speaker":"mayor","SubjectKey":"appointment.subject","TextKey":"appointment.body","Next":"ledger","Checkpoint":true,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":[]},{"Id":"ledger","Kind":0,"Chapter":1,"Speaker":"engineer","SubjectKey":"ledger.subject","TextKey":"ledger.body","Next":"first-warning","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["gauge","ledger"]},{"Id":"first-warning","Kind":1,"Chapter":1,"Speaker":"journalist","SubjectKey":"first-warning.subject","TextKey":"first-warning.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[{"Id":"publish","TextKey":"publish.text","Target":"whistleblower","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":"hint.publish","Effects":[{"Kind":2,"Variable":"trust","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"trust.up"},{"Kind":2,"Variable":"journalist","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null},{"Kind":0,"Variable":"published","Boolean":true,"Integer":0,"Member":null,"DisclosureKey":null}]},{"Id":"verify-first","TextKey":"verify-first.text","Target":"verification","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"prepared.up"},{"Kind":2,"Variable":"mayor","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null}]}],"Branches":[],"Effects":[],"Journal":[]},{"Id":"whistleblower","Kind":0,"Chapter":1,"Speaker":"journalist","SubjectKey":"whistleblower.subject","TextKey":"whistleblower.body","Next":"verification","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":[]},{"Id":"verification","Kind":0,"Chapter":1,"Speaker":"ferryman","SubjectKey":"verification.subject","TextKey":"verification.body","Next":"witness-response","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["witness"]},{"Id":"witness-response","Kind":1,"Chapter":1,"Speaker":"ferryman","SubjectKey":"witness-response.subject","TextKey":"witness-response.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[{"Id":"protect-register","TextKey":"protect-register.text","Target":"mill","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"trust","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"trust.up"},{"Kind":2,"Variable":"ferryman","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null},{"Kind":3,"Variable":"facts","Boolean":false,"Integer":0,"Member":"households","DisclosureKey":null}]},{"Id":"official-register","TextKey":"official-register.text","Target":"mill","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"prepared.up"},{"Kind":2,"Variable":"mayor","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null}]}],"Branches":[],"Effects":[],"Journal":[]},{"Id":"mill","Kind":0,"Chapter":1,"Speaker":"engineer","SubjectKey":"mill.subject","TextKey":"mill.body","Next":"sluice","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["mill"]},{"Id":"sluice","Kind":0,"Chapter":1,"Speaker":"doctor","SubjectKey":"sluice.subject","TextKey":"sluice.body","Next":"triage","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["clinic"]},{"Id":"triage","Kind":1,"Chapter":1,"Speaker":"doctor","SubjectKey":"triage.subject","TextKey":"triage.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[{"Id":"clinic-promise","TextKey":"clinic-promise.text","Target":"chapter-one-close","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":3,"Variable":"promises","Boolean":false,"Integer":0,"Member":"clinic","DisclosureKey":"promise.made"},{"Kind":2,"Variable":"doctor","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null},{"Kind":2,"Variable":"trust","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"trust.up"}]},{"Id":"wall-first","TextKey":"wall-first.text","Target":"chapter-one-close","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":2,"Member":null,"DisclosureKey":"prepared.up"},{"Kind":2,"Variable":"engineer","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null}]}],"Branches":[],"Effects":[],"Journal":[]},{"Id":"chapter-one-close","Kind":0,"Chapter":1,"Speaker":"mayor","SubjectKey":"chapter-one-close.subject","TextKey":"chapter-one-close.body","Next":"route","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":[]},{"Id":"route","Kind":2,"Chapter":2,"Speaker":null,"SubjectKey":"route.subject","TextKey":"route.body","Next":"council-briefing","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[{"Condition":{"Kind":3,"Variable":"trust","Boolean":true,"Integer":3,"Member":null,"Children":[]},"Target":"landing-briefing"}],"Effects":[],"Journal":[]},{"Id":"council-briefing","Kind":0,"Chapter":2,"Speaker":"engineer","SubjectKey":"council-briefing.subject","TextKey":"council-briefing.body","Next":"council-allocation","Checkpoint":true,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["chain"]},{"Id":"council-allocation","Kind":1,"Chapter":2,"Speaker":"mayor","SubjectKey":"council-allocation.subject","TextKey":"council-allocation.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[{"Id":"long-window","TextKey":"long-window.text","Target":"council-archive","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"trust","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"trust.up"},{"Kind":2,"Variable":"ferryman","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null}]},{"Id":"short-window","TextKey":"short-window.text","Target":"council-archive","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":2,"Member":null,"DisclosureKey":"prepared.up"},{"Kind":2,"Variable":"mayor","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null}]}],"Branches":[],"Effects":[],"Journal":[]},{"Id":"council-archive","Kind":0,"Chapter":2,"Speaker":"journalist","SubjectKey":"council-archive.subject","TextKey":"council-archive.body","Next":"council-requisition","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["archive"]},{"Id":"council-requisition","Kind":1,"Chapter":2,"Speaker":"engineer","SubjectKey":"council-requisition.subject","TextKey":"council-requisition.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[{"Id":"council-clinic","TextKey":"council-clinic.text","Target":"council-signal","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":3,"Variable":"kept","Boolean":false,"Integer":0,"Member":"clinic","DisclosureKey":null},{"Kind":2,"Variable":"trust","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"trust.up"},{"Kind":2,"Variable":"doctor","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null}]},{"Id":"council-gate","TextKey":"council-gate.text","Target":"council-signal","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":2,"Member":null,"DisclosureKey":"prepared.up"},{"Kind":2,"Variable":"engineer","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null}]}],"Branches":[],"Effects":[],"Journal":[]},{"Id":"council-signal","Kind":0,"Chapter":2,"Speaker":"mayor","SubjectKey":"council-signal.subject","TextKey":"council-signal.body","Next":"council-map","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["signal"]},{"Id":"council-map","Kind":0,"Chapter":2,"Speaker":"ferryman","SubjectKey":"council-map.subject","TextKey":"council-map.body","Next":"chapter-two-close","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[{"Kind":3,"Variable":"facts","Boolean":false,"Integer":0,"Member":"households","DisclosureKey":null}],"Journal":["map"]},{"Id":"landing-briefing","Kind":0,"Chapter":2,"Speaker":"ferryman","SubjectKey":"landing-briefing.subject","TextKey":"landing-briefing.body","Next":"landing-bargain","Checkpoint":true,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["boats"]},{"Id":"landing-bargain","Kind":1,"Chapter":2,"Speaker":"ferryman","SubjectKey":"landing-bargain.subject","TextKey":"landing-bargain.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[{"Id":"fleet-guarantee","TextKey":"fleet-guarantee.text","Target":"landing-households","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"trust","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"trust.up"},{"Kind":2,"Variable":"ferryman","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null}]},{"Id":"fleet-volunteers","TextKey":"fleet-volunteers.text","Target":"landing-households","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":2,"Member":null,"DisclosureKey":"prepared.up"}]}],"Branches":[],"Effects":[],"Journal":[]},{"Id":"landing-households","Kind":0,"Chapter":2,"Speaker":"journalist","SubjectKey":"landing-households.subject","TextKey":"landing-households.body","Next":"landing-clinic","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[{"Kind":3,"Variable":"facts","Boolean":false,"Integer":0,"Member":"households","DisclosureKey":null}],"Journal":["map"]},{"Id":"landing-clinic","Kind":1,"Chapter":2,"Speaker":"doctor","SubjectKey":"landing-clinic.subject","TextKey":"landing-clinic.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[{"Id":"landing-patients","TextKey":"landing-patients.text","Target":"landing-archive","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":3,"Variable":"kept","Boolean":false,"Integer":0,"Member":"clinic","DisclosureKey":null},{"Kind":2,"Variable":"doctor","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":null},{"Kind":2,"Variable":"trust","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"trust.up"}]},{"Id":"landing-capacity","TextKey":"landing-capacity.text","Target":"landing-archive","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":2,"Member":null,"DisclosureKey":"prepared.up"}]}],"Branches":[],"Effects":[],"Journal":[]},{"Id":"landing-archive","Kind":0,"Chapter":2,"Speaker":"journalist","SubjectKey":"landing-archive.subject","TextKey":"landing-archive.body","Next":"landing-signal","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["archive"]},{"Id":"landing-signal","Kind":0,"Chapter":2,"Speaker":"ferryman","SubjectKey":"landing-signal.subject","TextKey":"landing-signal.body","Next":"chapter-two-close","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["signal"]},{"Id":"chapter-two-close","Kind":0,"Chapter":2,"Speaker":"engineer","SubjectKey":"chapter-two-close.subject","TextKey":"chapter-two-close.body","Next":"final-packet","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["forecast"]},{"Id":"final-packet","Kind":0,"Chapter":3,"Speaker":"mayor","SubjectKey":"final-packet.subject","TextKey":"final-packet.body","Next":"evidence-review","Checkpoint":true,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":[]},{"Id":"evidence-review","Kind":1,"Chapter":3,"Speaker":"journalist","SubjectKey":"evidence-review.subject","TextKey":"evidence-review.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[{"Id":"shared-roster","TextKey":"shared-roster.text","Target":"promise-check","Requirement":{"Kind":4,"Variable":"facts","Boolean":true,"Integer":0,"Member":"households","Children":[]},"Unavailable":1,"DisabledReasonKey":"needs.map","HintKey":null,"Effects":[{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"prepared.up"},{"Kind":2,"Variable":"trust","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"trust.up"}]},{"Id":"technical-notice","TextKey":"technical-notice.text","Target":"promise-check","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":2,"Member":null,"DisclosureKey":"prepared.up"}]},{"Id":"personal-notice","TextKey":"personal-notice.text","Target":"promise-check","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"trust","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"trust.up"}]},{"Id":"minimal-notice","TextKey":"minimal-notice.text","Target":"promise-check","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"trust","Boolean":false,"Integer":-2,"Member":null,"DisclosureKey":null},{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":-2,"Member":null,"DisclosureKey":null}]}],"Branches":[],"Effects":[],"Journal":[]},{"Id":"promise-check","Kind":2,"Chapter":3,"Speaker":null,"SubjectKey":"promise-check.subject","TextKey":"promise-check.body","Next":"promise-unsettled","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[{"Condition":{"Kind":4,"Variable":"kept","Boolean":true,"Integer":0,"Member":"clinic","Children":[]},"Target":"promise-kept"}],"Effects":[],"Journal":[]},{"Id":"promise-kept","Kind":0,"Chapter":3,"Speaker":"doctor","SubjectKey":"promise-kept.subject","TextKey":"promise-kept.body","Next":"evacuation","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":["roster"]},{"Id":"promise-unsettled","Kind":0,"Chapter":3,"Speaker":"doctor","SubjectKey":"promise-unsettled.subject","TextKey":"promise-unsettled.body","Next":"evacuation","Checkpoint":false,"Variants":[{"Condition":{"Kind":4,"Variable":"promises","Boolean":true,"Integer":0,"Member":"clinic","Children":[]},"TextKey":"broken-promise.body"}],"Choices":[],"Branches":[],"Effects":[],"Journal":[]},{"Id":"evacuation","Kind":1,"Chapter":3,"Speaker":"mayor","SubjectKey":"evacuation.subject","TextKey":"evacuation.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[{"Id":"joint-command","TextKey":"joint-command.text","Target":"outcome","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"prepared.up"},{"Kind":2,"Variable":"trust","Boolean":false,"Integer":1,"Member":null,"DisclosureKey":"trust.up"}]},{"Id":"central-command","TextKey":"central-command.text","Target":"outcome","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":2,"Member":null,"DisclosureKey":"prepared.up"},{"Kind":2,"Variable":"trust","Boolean":false,"Integer":-2,"Member":null,"DisclosureKey":null}]},{"Id":"local-command","TextKey":"local-command.text","Target":"outcome","Requirement":{"Kind":0,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[]},"Unavailable":0,"DisabledReasonKey":null,"HintKey":null,"Effects":[{"Kind":2,"Variable":"trust","Boolean":false,"Integer":2,"Member":null,"DisclosureKey":"trust.up"},{"Kind":2,"Variable":"preparedness","Boolean":false,"Integer":-2,"Member":null,"DisclosureKey":null}]}],"Branches":[],"Effects":[],"Journal":[]},{"Id":"outcome","Kind":2,"Chapter":3,"Speaker":null,"SubjectKey":"outcome.subject","TextKey":"outcome.body","Next":"ending-fracture","Checkpoint":false,"Variants":[],"Choices":[],"Branches":[{"Condition":{"Kind":5,"Variable":null,"Boolean":true,"Integer":0,"Member":null,"Children":[{"Kind":3,"Variable":"preparedness","Boolean":true,"Integer":4,"Member":null,"Children":[]},{"Kind":3,"Variable":"trust","Boolean":true,"Integer":4,"Member":null,"Children":[]}]},"Target":"ending-together"},{"Condition":{"Kind":3,"Variable":"preparedness","Boolean":true,"Integer":4,"Member":null,"Children":[]},"Target":"ending-wall"},{"Condition":{"Kind":3,"Variable":"trust","Boolean":true,"Integer":4,"Member":null,"Children":[]},"Target":"ending-river"}],"Effects":[],"Journal":[]},{"Id":"ending-together","Kind":3,"Chapter":3,"Speaker":"journalist","SubjectKey":"ending-together.subject","TextKey":"ending-together.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":[]},{"Id":"ending-wall","Kind":3,"Chapter":3,"Speaker":"engineer","SubjectKey":"ending-wall.subject","TextKey":"ending-wall.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":[]},{"Id":"ending-river","Kind":3,"Chapter":3,"Speaker":"ferryman","SubjectKey":"ending-river.subject","TextKey":"ending-river.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":[]},{"Id":"ending-fracture","Kind":3,"Chapter":3,"Speaker":"doctor","SubjectKey":"ending-fracture.subject","TextKey":"ending-fracture.body","Next":null,"Checkpoint":false,"Variants":[],"Choices":[],"Branches":[],"Effects":[],"Journal":[]}],"Characters":[{"Id":"mayor","Name":"Mayor
+    Iona Vale","ProfileKey":"mayor.profile"},{"Id":"engineer","Name":"Engineer Sera
+    Penn","ProfileKey":"engineer.profile"},{"Id":"ferryman","Name":"Ferryman Tomas
+    Reed","ProfileKey":"ferryman.profile"},{"Id":"doctor","Name":"Dr. Ada Marr","ProfileKey":"doctor.profile"},{"Id":"journalist","Name":"Reporter
+    Elian Quill","ProfileKey":"journalist.profile"}],"Journal":[{"Id":"gauge","TitleKey":"gauge.title","TextKey":"gauge.entry"},{"Id":"ledger","TitleKey":"ledger.title","TextKey":"ledger.entry"},{"Id":"witness","TitleKey":"witness.title","TextKey":"witness.entry"},{"Id":"mill","TitleKey":"mill.title","TextKey":"mill.entry"},{"Id":"map","TitleKey":"map.title","TextKey":"map.entry"},{"Id":"clinic","TitleKey":"clinic.title","TextKey":"clinic.entry"},{"Id":"chain","TitleKey":"chain.title","TextKey":"chain.entry"},{"Id":"boats","TitleKey":"boats.title","TextKey":"boats.entry"},{"Id":"archive","TitleKey":"archive.title","TextKey":"archive.entry"},{"Id":"signal","TitleKey":"signal.title","TextKey":"signal.entry"},{"Id":"forecast","TitleKey":"forecast.title","TextKey":"forecast.entry"},{"Id":"roster","TitleKey":"roster.title","TextKey":"roster.entry"}],"Text":{"mayor.profile":"An
+    elected caretaker who remembers the panic during the last flood. She believes
+    a coordinated message saves lives.","engineer.profile":"Keeper of the floodwall
+    gauges. She trusts measurements but needs workers to act on them.","ferryman.profile":"Runs
+    the night crossings. His crews know every inhabited stair below the official
+    waterline.","doctor.profile":"Operates the riverside clinic. Moving patients
+    without preparation can be as dangerous as staying.","journalist.profile":"Prints
+    a neighborhood bulletin. His sources fear that a warning will become an excuse
+    to abandon their homes.","gauge.title":"The rising gauge","gauge.entry":"The
+    north gauge rose six marks overnight. The published report uses yesterday''s
+    reading.","ledger.title":"Maintenance ledger","ledger.entry":"The lower sluice
+    inspection was deferred twice. Its chain has never been tested under a full river.","witness.title":"A
+    ferryman''s witness","witness.entry":"Tomas saw water entering the service tunnel
+    while the main wall remained dry.","mill.title":"Mill allotment","mill.entry":"The
+    mill has timber and a portable pump. Its owner will release them when an officer
+    signs the requisition.","map.title":"Unregistered households","map.entry":"Thirty-two
+    households live below the survey line. They are absent from the city''s evacuation
+    count.","clinic.title":"Clinic transfer list","clinic.entry":"Six patients require
+    boats with room for stretchers. A public quay can handle only two at a time.","chain.title":"Sluice
+    chain test","chain.entry":"The chain will hold a partial opening. A full opening
+    risks losing the gate entirely.","boats.title":"Night fleet","boats.entry":"Fishing
+    skiffs can reach the back stairs if their owners receive a promise of fuel and
+    safe return.","archive.title":"The old flood","archive.entry":"The previous council
+    blamed panic, but its private minutes describe a warning issued too late.","signal.title":"Bell
+    signals","signal.entry":"One bell means prepare, two means move, three means
+    the lower crossing has closed. The neighborhoods already know these signals.","forecast.title":"Upstream
+    forecast","forecast.entry":"A second crest will arrive after midnight. A plan
+    that survives the first surge may still fail.","roster.title":"Joint evacuation
+    roster","roster.entry":"Crews, boats, patients, and unregistered households can
+    be coordinated on a single shared list.","trust.up":"Public trust increased.","prepared.up":"Evacuation
+    preparedness increased.","promise.made":"Promise recorded: protect the riverside
+    clinic.","needs.map":"You need evidence of the unregistered households.","hint.publish":"Residents
+    will receive the warning; the mayor will lose control of its timing.","appointment.subject":"Your
+    temporary appointment","appointment.body":"The river has climbed the first stair.
+    I am giving you the correspondence desk because every office has sent me a different
+    account. Read the originals. Send replies in your own name.\n\nThe city cannot
+    evacuate on rumor, and it cannot survive on reassurance alone. By evening I need
+    a plan that the boat crews, clinic, and wall workers will actually follow. Your
+    first packet is beside the maintenance ledger.","ledger.subject":"A measurement
+    is not a reassurance","ledger.body":"The [[gauge|north gauge]] has risen six
+    marks. The circular on your desk says two. That was true yesterday. Please retain
+    both documents; the difference is the point.\n\nThe [[ledger|lower sluice inspection]]
+    was deferred again. I can send a crew to test its chain, or reinforce the service
+    tunnel. I cannot do both without the mill''s timber. Ask who signed the deferral
+    before someone calls this an unforeseeable failure.","first-warning.subject":"May
+    I print the gauge reading?","first-warning.body":"I have tomorrow''s paper ready,
+    which may be a luxury we no longer possess. Give me a verified number and I will
+    print it tonight. Give me an instruction to wait and I will tell people that
+    instruction came from you.\n\nA warning without a route can frighten people.
+    Silence without a route leaves them asleep. Which risk are you willing to put
+    your name beneath?","publish.text":"Publish the current reading and explain what
+    remains uncertain.","verify-first.text":"Verify the tunnel report before issuing
+    a coordinated notice.","whistleblower.subject":"The name beneath the number","whistleblower.body":"The
+    compositor asks whether the engineer consented to being named. I have removed
+    her signature from the proof and left the measurement. Facts should be public;
+    frightened sources do not have to be.\n\nTomas has sent a runner. He says the
+    tunnel is already taking water. He will speak to you, but not to a council committee.","verification.subject":"Water
+    under the wall","verification.body":"I tied up beside the service tunnel at dawn.
+    Water was coming out, not going in. The wall is holding and the city is flooding
+    anyway. Put that in whatever language your office requires.\n\nThere are families
+    below the survey line. We ferry their children every school morning, so please
+    do not tell me your register says nobody lives there.","witness-response.subject":"Whose
+    names go on the list?","witness-response.body":"I can give you the household
+    names. Some families have good reasons to avoid official lists. Promise that
+    this is an evacuation register, not a rent inspection, and I will bring the whole
+    book.","protect-register.text":"Keep the household list with the rescue crews
+    and protect its other uses.","official-register.text":"Require the names in the
+    official register to coordinate supplies.","mill.subject":"A signature releases
+    the timber","mill.body":"The mill owner is waiting for a requisition. His pump
+    would keep the clinic approach dry; his timber could brace the tunnel. He asks
+    who will pay if neither comes back.\n\nI have attached the inventory rather than
+    his argument. We need decisions about actual objects now: one pump, six carts,
+    thirty beams. The river will not accept an undertaking in place of a beam.","sluice.subject":"Patients
+    are not cargo","sluice.body":"Six patients cannot walk to the upper ward. Each
+    needs a stretcher boat and someone who knows their medication. If you send a
+    general evacuation order, healthy families will fill the quay before my attendants
+    arrive.\n\nPromise a protected transfer window or tell me plainly that I must
+    make another arrangement. I can work with an unwelcome answer. I cannot work
+    with a promise nobody intends to keep.","triage.subject":"The first allocation","triage.body":"The
+    requisition form has two lines. On the first, tell the mill where to send the
+    pump. On the second, tell me whether I should prepare the patients for transfer.
+    The crews are waiting for the same signature.","clinic-promise.text":"Send the
+    pump to the clinic and promise a protected transfer.","wall-first.text":"Brace
+    the tunnel first; tell the clinic it must arrange its own window.","chapter-one-close.subject":"Two
+    routes through the same night","chapter-one-close.body":"The first replies have
+    gone. The crews now know where your signature carries weight. Sera wants you
+    at the sluice briefing. Tomas wants you at the neighborhood landing. Neither
+    meeting can wait for the other.\n\nYour earlier decisions have determined who
+    will share their plan with you. Whichever door opens, remember that the people
+    behind the other one will still be here when the water arrives.","route.subject":"","route.body":"","council-briefing.subject":"The
+    sluice briefing","council-briefing.body":"The chain test held at half travel.
+    At full travel the gate shudders. We can reduce pressure by opening halfway,
+    but the lower street will flood deliberately.\n\nI need an officer to take responsibility
+    for that street''s evacuation before I touch the wheel. Engineering is not permission
+    to decide who gets wet.","council-allocation.subject":"The street below the gate","council-allocation.body":"The
+    official count says the lower street can be cleared in twenty minutes. Tomas
+    says it will take twice that. We can delay the opening, or accept a shorter window
+    and reserve more workers for the wall.","long-window.text":"Use the ferrymen''s
+    count and delay until every stair has been checked.","short-window.text":"Use
+    the official count and reinforce the wall immediately.","council-archive.subject":"The
+    minutes nobody printed","council-archive.body":"A clerk found the old flood minutes.
+    The public account blamed panic. The private account says the warning arrived
+    after the boats had stopped running.\n\nYou do not have to repeat their conclusion
+    merely because the same room is making it. I am sending a copy to the desk, not
+    to the press. Decide what this evidence changes before deciding what it proves.","council-requisition.subject":"Reserve
+    crews","council-requisition.body":"The reserve crew can escort clinic boats or
+    reinforce the eastern gate. Both tasks improve someone''s chances. Only one can
+    be done before the crest.","council-clinic.text":"Assign the reserve to the clinic
+    transfer.","council-gate.text":"Assign the reserve to the eastern gate.","council-signal.subject":"A
+    signal everyone knows","council-signal.body":"The neighborhoods already use the
+    old bell signals. We could issue a new code, but then people would have to learn
+    it while listening for danger. Use the familiar bells. Put the instructions in
+    every notice.\n\nI will stand beside the bell keeper if that makes the order
+    credible. Your office must make sure credibility reaches the stairs below the
+    survey line.","council-map.subject":"The missing stairs","council-map.body":"Here
+    is [[map|the map your survey missed]]. I have marked each landing, including
+    the ones people built themselves. It is accurate because we use it, not because
+    anyone approved it.\n\nAdd these households to the plan before you announce that
+    everyone has a place.","landing-briefing.subject":"The neighborhood landing","landing-briefing.body":"The
+    skiff owners came because they heard your office would listen. There are more
+    boats than the council counted, but the owners need fuel and a guarantee that
+    officials will let them back through the cordon.\n\nDo not requisition their
+    livelihoods and call it cooperation. Tell them what you need and what the city
+    owes them in return.","landing-bargain.subject":"A fleet or a favor","landing-bargain.body":"The
+    owners ask for a signed fuel guarantee. You can make that promise and coordinate
+    a fleet, or ask for volunteers and keep the city''s remaining funds for the wall.","fleet-guarantee.text":"Guarantee
+    fuel and return passage for every participating skiff.","fleet-volunteers.text":"Ask
+    volunteers to take the first crossing; reserve funds for repairs.","landing-households.subject":"A
+    city larger than its register","landing-households.body":"I have spoken to the
+    families on Tomas''s map. Several thought the evacuation notice did not apply
+    to them because their street was not named. Others feared the upper shelter would
+    demand papers.\n\nWrite the next notice so that it answers both fears. You are
+    not merely transmitting information. You are telling people whether the city
+    considers them its own.","landing-clinic.subject":"The narrow boats","landing-clinic.body":"Two
+    fishing skiffs can take the stretchers if we remove their nets. That leaves fewer
+    seats on the first crossing. I will not hide that trade from the waiting families.
+    Will your office explain it with me?","landing-patients.text":"Protect the patient
+    crossing and explain the delay to the families.","landing-capacity.text":"Use
+    every seat for the first evacuation; arrange patients afterward.","landing-archive.subject":"The
+    old excuse","landing-archive.body":"The old minutes reached the landing before
+    they reached the mayor. People remember being blamed for panic. They are asking
+    whether this warning will arrive in time.\n\nGive them a route and a signal,
+    not a defense of the institution. Tomas has already chalked the bell code onto
+    the shelter door.","landing-signal.subject":"Bells across the water","landing-signal.body":"One
+    to prepare. Two to move. Three when the lower crossing closes. The skiffs can
+    carry that message farther than a printed order if every landing repeats it.\n\nThe
+    crews are ready. Now send us the same roster the wall workers use, so that a
+    closed gate does not cut off an open route.","chapter-two-close.subject":"One
+    plan, two kinds of knowledge","chapter-two-close.body":"Your reports finally
+    agree on something: the second crest will be worse. The sluice calculation assumes
+    the lower street is clear. The boat plan assumes the eastern gate holds. Neither
+    plan survives alone.\n\nI have put both on the same sheet. Please keep them there
+    when the arguments begin again.","final-packet.subject":"Before the second crest","final-packet.body":"There
+    will be no further committee. The final packet contains the roster, your earlier
+    promises, and every reply received. Read them before you issue the last order.\n\nPreparedness
+    stands at {preparedness}; public trust stands at {trust}. These are signs of
+    what people can do together, not guarantees. The final decision still belongs
+    to you.","evidence-review.subject":"What goes in the public notice?","evidence-review.body":"The
+    public notice can carry the full household map, the technical plan, or a shorter
+    instruction. A useful notice tells people where they belong and what they must
+    do next.","shared-roster.text":"Publish a shared roster covering every household
+    and rescue crew.","technical-notice.text":"Publish the gate schedule and official
+    shelter assignments.","personal-notice.text":"Ask each landing captain to deliver
+    a personal warning.","minimal-notice.text":"Issue a brief reassurance and withhold
+    the contested plans until after the crest.","promise-check.subject":"","promise-check.body":"","promise-kept.subject":"Six
+    names crossed off safely","promise-kept.body":"All six patients are on the upper
+    ward. The crews kept the transfer window open, and the families understood why.
+    I have sent the freed boats back to Tomas.\n\nYou may count this promise as kept.
+    Please remember that the result depended on the attendants, the boat owners,
+    and the people who waited without pushing ahead.","promise-unsettled.subject":"The
+    transfer still waiting","promise-unsettled.body":"The patients remain at the
+    quay. We have made another arrangement, but it is slower and uses boats that
+    were meant for the last households.\n\nIf you promised a window, this is the
+    consequence of losing it. If you refused one, this is the cost you asked us to
+    bear. Either way, write the patients into the final order.","broken-promise.body":"You
+    promised a protected transfer. My attendants prepared for it. The boats were
+    reassigned without telling us. We are improvising now, and people who trusted
+    your word are paying for the delay.\n\nThere is still time to help. Acknowledge
+    the broken promise in the final order and give the landing crews the authority
+    to finish the transfer.","evacuation.subject":"The final order","evacuation.body":"The
+    bell keeper has a hand on the rope. Sera waits at the wheel. Tomas waits at the
+    landing. Ada waits beside the stretchers. Elian has left a blank space for your
+    words.\n\nYou cannot remove the flood. Choose how the city meets it.","joint-command.text":"Give
+    the wall crew and landing captains joint authority under one public plan.","central-command.text":"Centralize
+    control at the wall and prioritize the gate schedule.","local-command.text":"Let
+    the neighborhoods choose their own routes; keep boats available to them.","outcome.subject":"","outcome.body":"","ending-together.subject":"The
+    city that answered","ending-together.body":"The second crest took the lower street
+    and left the shelters standing. The shared roster let crews find the last households
+    before the third bell. Not every beam held. Enough people knew the plan to adapt
+    when one failed.\n\nIn the morning, your correspondence desk becomes a claims
+    desk. Promises made during an emergency do not expire with the water. The first
+    letter asks when the skiff owners will receive their fuel.","ending-wall.subject":"A
+    wall that held","ending-wall.body":"The gates survived. The upper city remained
+    dry. On the lower stairs, orders arrived faster than explanations, and several
+    crews worked outside the official plan.\n\nThe mayor calls the operation a success.
+    The inquiry will ask whose absence made the final count look clean. Sera sends
+    you the measurements without a covering note. They tell one part of what happened.
+    The letters tell the rest.","ending-river.subject":"A city carried by its people","ending-river.body":"The
+    neighborhood fleet brought people out through routes the official map never showed.
+    The eastern gate failed before dawn. Workshops and homes stood in the water,
+    but their occupants stood together on the upper quay.\n\nRebuilding will be harder
+    because some preparations were never made. Tomas asks you to keep the household
+    map. The city should not have to rediscover its own people at the next flood.","ending-fracture.subject":"The
+    letters that arrived late","ending-fracture.body":"The plans did not join in
+    time. Boats waited at a closed gate while workers waited for a cleared street.
+    The clinic''s last transfer reached the upper ward after the second crest.\n\nAt
+    dawn, survivors bring names to your desk. You keep the conflicting orders beside
+    them. The inquiry must begin with what the city knew, what it promised, and what
+    it failed to do. You open a fresh ledger."}}'
+  Positions: []

@@ -1,0 +1,25 @@
+{
+  "name": "IdleHands.PlayModeTests",
+  "references": [
+    "IncrementalFramework.Unity",
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "BreakInfinity",
+    "UnityEngine.UI",
+    "IncrementalFramework.Games.Rpg",
+    "IncrementalFramework.Persistence",
+    "IncrementalFramework.Samples.IdleRpg",
+    "IncrementalFramework.Combat",
+    "IncrementalFramework.UI",
+    "IncrementalFramework.Definitions",
+    "IncrementalFramework.Features",
+    "IncrementalFramework.Samples.Expanded",
+    "IncrementalFramework.Unity.Expanded",
+    "IncrementalFramework.Tutorials"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "autoReferenced": false
+}

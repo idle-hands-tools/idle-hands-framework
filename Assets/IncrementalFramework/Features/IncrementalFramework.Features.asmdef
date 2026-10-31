@@ -1,0 +1,1 @@
+{"name":"IncrementalFramework.Features","references":["IncrementalFramework.Core","IncrementalFramework.Definitions","IncrementalFramework.Economy","IncrementalFramework.Progression","IncrementalFramework.Persistence","BreakInfinity"],"noEngineReferences":true}

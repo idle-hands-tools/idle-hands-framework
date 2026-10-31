@@ -1,0 +1,18 @@
+{
+  "name": "IncrementalFramework.Samples.IdleRpg",
+  "rootNamespace": "IncrementalFramework.Samples.IdleRpg",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Definitions",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "IncrementalFramework.Persistence",
+    "IncrementalFramework.Games.Rpg",
+    "IncrementalFramework.Combat",
+    "IncrementalFramework.Unity.Rpg",
+    "BreakInfinity",
+    "IncrementalFramework.Unity"
+  ],
+  "noEngineReferences": false,
+  "autoReferenced": true
+}

@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>IncrementalFramework.UI</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Core/IncrementalFramework.Core.csproj" />
+    <ProjectReference Include="../Definitions/IncrementalFramework.Definitions.csproj" />
+    <ProjectReference Include="../BreakInfinity/IncrementalFramework.BreakInfinity.csproj" />
+    <Compile Include="../../Assets/IncrementalFramework/UI/**/*.cs" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,48 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1000000000000000000000000000004, type: 3}
+  m_Name: citadel
+  m_EditorClassIdentifier:
+  id: citadel
+  displayName: "Citadel / spend 250 troops + 400 food + 250 timber; frontier united!"
+  triggerKind: 2
+  useResourceThreshold: 0
+  conditions:
+  - kind: 0
+    targetId: territory
+    amount: 2
+  - kind: 0
+    targetId: troops
+    amount: 250
+  - kind: 0
+    targetId: food
+    amount: 400
+  - kind: 0
+    targetId: timber
+    amount: 250
+  rootConditionIndex: -1
+  actions:
+  - kind: 3
+    targetId: troops
+    amount: 250
+  - kind: 3
+    targetId: food
+    amount: 400
+  - kind: 3
+    targetId: timber
+    amount: 250
+  - kind: 0
+    targetId: territory
+    amount: 1
+  repeat: 0
+  cooldownSeconds: 0
+  resetOnPrestige: 1

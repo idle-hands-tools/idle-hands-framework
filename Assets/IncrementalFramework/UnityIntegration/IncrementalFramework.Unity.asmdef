@@ -1,0 +1,16 @@
+{
+  "name": "IncrementalFramework.Unity",
+  "rootNamespace": "IncrementalFramework.Unity",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "IncrementalFramework.Persistence",
+    "BreakInfinity",
+    "UnityEngine.UI",
+    "IncrementalFramework.UI",
+    "IncrementalFramework.Definitions",
+    "IncrementalFramework.Tutorials"
+  ],
+  "autoReferenced": true
+}

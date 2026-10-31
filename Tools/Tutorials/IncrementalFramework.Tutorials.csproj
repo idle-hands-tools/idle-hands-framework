@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../Assets/IncrementalFramework/Tutorials/**/*.cs" />
+    <ProjectReference Include="../Progression/IncrementalFramework.Progression.csproj" />
+    <ProjectReference Include="../UI/IncrementalFramework.UI.csproj" />
+  </ItemGroup>
+</Project>

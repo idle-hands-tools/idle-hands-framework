@@ -1,0 +1,33 @@
+{
+  "name": "IncrementalFramework.Tests.EditMode",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "IncrementalFramework.Persistence",
+    "BreakInfinity",
+    "IncrementalFramework.Games.Rpg",
+    "IncrementalFramework.Definitions",
+    "IncrementalFramework.Samples.IdleRpg",
+    "IncrementalFramework.Combat",
+    "IncrementalFramework.Games.Clicker",
+    "IncrementalFramework.Games.Strategy",
+    "IncrementalFramework.UI",
+    "IncrementalFramework.Features",
+    "IncrementalFramework.Samples.Expanded",
+    "IncrementalFramework.Unity.Expanded",
+    "IncrementalFramework.Unity",
+    "IncrementalFramework.Tutorials"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "nunit.framework.dll",
+    "Newtonsoft.Json.dll"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "name": "IncrementalFramework.Economy",
+  "rootNamespace": "IncrementalFramework.Economy",
+  "references": [
+    "IncrementalFramework.Core",
+    "BreakInfinity",
+    "IncrementalFramework.Definitions"
+  ],
+  "autoReferenced": true,
+  "noEngineReferences": true
+}
