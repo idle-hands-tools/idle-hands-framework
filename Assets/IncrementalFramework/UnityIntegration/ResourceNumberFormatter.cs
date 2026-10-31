@@ -1,8 +1,12 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using System;
 using System.Globalization;
 using BreakInfinity;
 
-namespace IdleHands.UnityIntegration
+namespace IncrementalFramework.Unity
 {
     public sealed class ResourceNumberFormatter
     {

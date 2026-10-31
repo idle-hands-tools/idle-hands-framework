@@ -10,5 +10,6 @@
   <ItemGroup>
     <Compile Include="../../Assets/IncrementalFramework/Economy/**/*.cs" />
     <ProjectReference Include="../Core/IncrementalFramework.Core.csproj" />
+    <ProjectReference Include="../Definitions/IncrementalFramework.Definitions.csproj" />
   </ItemGroup>
 </Project>

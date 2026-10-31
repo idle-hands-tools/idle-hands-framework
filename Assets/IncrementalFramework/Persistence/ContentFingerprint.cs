@@ -1,3 +1,6 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
 using System;
 using System.Globalization;
 using System.Linq;
@@ -6,7 +9,7 @@ using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Persistence
 {
     public static class ContentFingerprint
     {

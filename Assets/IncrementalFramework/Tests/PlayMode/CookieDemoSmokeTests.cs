@@ -1,7 +1,10 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using System.Collections;
 using BreakInfinity;
-using IdleHands.UnityIntegration;
-using IncrementalFramework;
+using IncrementalFramework.Unity;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -17,7 +20,7 @@ namespace IdleHands.Tests
         {
             yield return SceneManager.LoadSceneAsync("CookieDemo", LoadSceneMode.Single);
             yield return null;
-            var bootstrap = Object.FindObjectOfType<CookieBootstrap>();
+            var bootstrap = Object.FindObjectOfType<EconomyBootstrap>();
             Assert.That(bootstrap, Is.Not.Null, "Build settings must include the saved CookieDemo scene.");
             bootstrap.SaveOnLifecycle = false;
             Assert.That(bootstrap.Simulation, Is.Not.Null, "The scene must have valid authoring references.");

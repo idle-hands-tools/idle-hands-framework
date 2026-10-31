@@ -1,5 +1,12 @@
+using ResourceAmount = IncrementalFramework.Unity.ResourceAmount;
+using RequirementKind = IncrementalFramework.Unity.RequirementKind;
+using RuleActionKind = IncrementalFramework.Unity.RuleActionKind;
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using System;
-using IdleHands.UnityIntegration;
+using IncrementalFramework.Unity;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -23,18 +30,18 @@ namespace IdleHands.Tests
         [Test]
         public void PresenterCanSubscribeToCoalescedCoreChanges()
         {
-            var simulation = new IncrementalFramework.Simulation(new IncrementalFramework.ContentDatabase(
-                new[] { new IncrementalFramework.ResourceDefinition("cookies") }));
+            var simulation = new IncrementalFramework.Progression.Simulation(new IncrementalFramework.Economy.ContentDatabase(
+                new[] { new IncrementalFramework.Economy.ResourceDefinition("cookies") }));
             int notifications = 0;
-            IncrementalFramework.SimulationChangeSet last = null;
+            IncrementalFramework.Progression.SimulationChangeSet last = null;
             simulation.Changed += changes => { notifications++; last = changes; };
-            Assert.That(simulation.Execute(new IncrementalFramework.GrantResourceCommand("cookies", 1)).Success, Is.True);
+            Assert.That(simulation.Execute(new IncrementalFramework.Progression.GrantResourceCommand("cookies", 1)).Success, Is.True);
             Assert.That(notifications, Is.EqualTo(1));
-            Assert.That(simulation.Execute(new IncrementalFramework.GrantResourceCommand("cookies", -1)).Success, Is.False);
+            Assert.That(simulation.Execute(new IncrementalFramework.Progression.GrantResourceCommand("cookies", -1)).Success, Is.False);
             Assert.That(notifications, Is.EqualTo(1));
             simulation.AdvanceTo(1);
             Assert.That(notifications, Is.EqualTo(1));
-            Assert.That(simulation.Execute(new IncrementalFramework.GrantResourceCommand("cookies", 2)).Success, Is.True);
+            Assert.That(simulation.Execute(new IncrementalFramework.Progression.GrantResourceCommand("cookies", 2)).Success, Is.True);
             Assert.That(notifications, Is.EqualTo(2));
             Assert.That(last.Deltas.Count, Is.EqualTo(1));
             Assert.That(last.Deltas[0].After.Amount, Is.EqualTo(new BreakInfinity.BigDouble(3)));
@@ -91,10 +98,10 @@ namespace IdleHands.Tests
                 Assert.That(compiled.Producers[0].Production.Count, Is.EqualTo(2));
                 Assert.That(compiled.Producers[0].Costs[1].ResourceId, Is.EqualTo("flour"));
                 Assert.That(compiled.Upgrades[0].Modifiers.Count, Is.EqualTo(4));
-                Assert.That(compiled.Upgrades[0].Modifiers[0].Kind, Is.EqualTo(IncrementalFramework.ModifierKind.Flat));
+                Assert.That(compiled.Upgrades[0].Modifiers[0].Kind, Is.EqualTo(IncrementalFramework.Economy.ModifierKind.Flat));
                 Assert.That(compiled.Upgrades[0].Modifiers[0].Value, Is.EqualTo(new BreakInfinity.BigDouble(-1)));
-                Assert.That(compiled.Upgrades[0].Modifiers[0].Target, Is.EqualTo(IncrementalFramework.ModifierTarget.ProducerCategoryProduction));
-                Assert.That(compiled.Upgrades[0].Modifiers[1].Target, Is.EqualTo(IncrementalFramework.ModifierTarget.ResourceCategoryProduction));
+                Assert.That(compiled.Upgrades[0].Modifiers[0].Target, Is.EqualTo(IncrementalFramework.Economy.ModifierTarget.ProducerCategoryProduction));
+                Assert.That(compiled.Upgrades[0].Modifiers[1].Target, Is.EqualTo(IncrementalFramework.Economy.ModifierTarget.ResourceCategoryProduction));
                 Assert.That(compiled.Upgrades[0].Modifiers[2].Priority, Is.EqualTo(5));
             }
             finally
@@ -158,16 +165,16 @@ namespace IdleHands.Tests
                 content.rules = new[] { rule };
                 content.flags = new[] { flag };
                 content.clickResource = resource;
-                var simulation = new IncrementalFramework.Simulation(ContentCompiler.Compile(content).Content);
-                Assert.That(simulation.Execute(new IncrementalFramework.BuyProducerCommand("cursor")).Success, Is.False);
-                Assert.That(simulation.Execute(new IncrementalFramework.ClickCommand("cookies", 1)).Success, Is.True);
-                Assert.That(simulation.Execute(new IncrementalFramework.ClickCommand("cookies", 1)).Success, Is.True);
-                Assert.That(simulation.Execute(new IncrementalFramework.BuyProducerCommand("cursor")).Success, Is.False);
-                Assert.That(simulation.Execute(new IncrementalFramework.SetFlagCommand("ready", true)).Success, Is.True);
-                Assert.That(simulation.Execute(new IncrementalFramework.BuyProducerCommand("cursor")).Success, Is.True);
-                Assert.That(simulation.Execute(new IncrementalFramework.BuyUpgradeCommand("clicks")).Success, Is.True);
+                var simulation = new IncrementalFramework.Progression.Simulation(ContentCompiler.Compile(content).Content);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.BuyProducerCommand("cursor")).Success, Is.False);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.ClickCommand("cookies", 1)).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.ClickCommand("cookies", 1)).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.BuyProducerCommand("cursor")).Success, Is.False);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.SetFlagCommand("ready", true)).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.BuyProducerCommand("cursor")).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.BuyUpgradeCommand("clicks")).Success, Is.True);
                 Assert.That(simulation.AdvanceTo(0).Completed, Is.True);
-                Assert.That(simulation.Execute(new IncrementalFramework.ClickCommand("cookies", 1)).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.ClickCommand("cookies", 1)).Success, Is.True);
                 Assert.That(simulation.GetResource("cookies").Balance, Is.EqualTo(new BreakInfinity.BigDouble(7)));
                 Assert.That(simulation.GetResource("cookies").LifetimeEarned, Is.EqualTo(new BreakInfinity.BigDouble(9)));
                 Assert.That(simulation.ExportState().Rules[0].Fired, Is.True);
@@ -214,10 +221,10 @@ namespace IdleHands.Tests
                 var compiled = ContentCompiler.Compile(content).Content;
                 Assert.That(compiled.Flags[0].Initial, Is.True);
                 var expression = compiled.Rules[0].Condition.Children[1];
-                Assert.That(expression.Kind, Is.EqualTo(IncrementalFramework.ConditionKind.And));
+                Assert.That(expression.Kind, Is.EqualTo(IncrementalFramework.Economy.ConditionKind.And));
                 Assert.That(expression.Children[0].FlagId, Is.EqualTo("ready"));
-                Assert.That(expression.Children[1].Kind, Is.EqualTo(IncrementalFramework.ConditionKind.Not));
-                Assert.That(expression.Children[1].Children[0].Kind, Is.EqualTo(IncrementalFramework.ConditionKind.Or));
+                Assert.That(expression.Children[1].Kind, Is.EqualTo(IncrementalFramework.Economy.ConditionKind.Not));
+                Assert.That(expression.Children[1].Children[0].Kind, Is.EqualTo(IncrementalFramework.Economy.ConditionKind.Or));
                 rule.booleanNodes[0].children = new[] { 0 };
                 Assert.That(ContentCompiler.Validate(content).Exists(x => x.Contains("cycle")), Is.True);
                 Assert.Throws<ContentValidationException>(() => ContentCompiler.Compile(content));
@@ -267,22 +274,22 @@ namespace IdleHands.Tests
                 var compiled = ContentCompiler.Compile(content).Content;
                 Assert.That(compiled.Prestige.UsesLifetimeReward, Is.True);
                 Assert.That(compiled.Prestige.RewardResourceId, Is.EqualTo("heaven"));
-                Assert.That(compiled.Rules[0].Actions[0], Is.TypeOf<IncrementalFramework.SpendResourceAction>());
-                Assert.That(((IncrementalFramework.SetFlagAction)compiled.Rules[0].Actions[1]).Value, Is.True);
-                var scheduled = (IncrementalFramework.ScheduleGrantResourceAction)compiled.Rules[0].Actions[2];
+                Assert.That(compiled.Rules[0].Actions[0], Is.TypeOf<IncrementalFramework.Economy.SpendResourceAction>());
+                Assert.That(((IncrementalFramework.Economy.SetFlagAction)compiled.Rules[0].Actions[1]).Value, Is.True);
+                var scheduled = (IncrementalFramework.Economy.ScheduleGrantResourceAction)compiled.Rules[0].Actions[2];
                 Assert.That(scheduled.Delay, Is.EqualTo(5));
                 Assert.That(scheduled.Priority, Is.EqualTo(7));
-                Assert.That(((IncrementalFramework.SetModifierAction)compiled.Rules[0].Actions[3]).ModifierId,
+                Assert.That(((IncrementalFramework.Economy.SetModifierAction)compiled.Rules[0].Actions[3]).ModifierId,
                     Is.EqualTo("click-boost"));
-                var simulation = new IncrementalFramework.Simulation(compiled);
-                Assert.That(simulation.Execute(new IncrementalFramework.GrantResourceCommand("cookies", 100)).Success, Is.True);
+                var simulation = new IncrementalFramework.Progression.Simulation(compiled);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.GrantResourceCommand("cookies", 100)).Success, Is.True);
                 Assert.That(simulation.GetPrestigeReward(), Is.EqualTo(BreakInfinity.BigDouble.One));
-                Assert.That(simulation.Execute(new IncrementalFramework.PrestigeCommand()).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.PrestigeCommand()).Success, Is.True);
                 Assert.That(simulation.GetResource("heaven").Balance, Is.EqualTo(BreakInfinity.BigDouble.One));
-                Assert.That(simulation.Execute(new IncrementalFramework.PrestigeCommand()).Success, Is.False);
-                Assert.That(simulation.Execute(new IncrementalFramework.GrantResourceCommand("cookies", 300)).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.PrestigeCommand()).Success, Is.False);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.GrantResourceCommand("cookies", 300)).Success, Is.True);
                 Assert.That(simulation.GetPrestigeReward(), Is.EqualTo(BreakInfinity.BigDouble.One));
-                Assert.That(simulation.Execute(new IncrementalFramework.PrestigeCommand()).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.PrestigeCommand()).Success, Is.True);
                 Assert.That(simulation.GetResource("heaven").Balance, Is.EqualTo(new BreakInfinity.BigDouble(2)));
                 Assert.That(simulation.PermanentMultiplier, Is.EqualTo(new BreakInfinity.BigDouble(1.2)));
             }
@@ -307,21 +314,21 @@ namespace IdleHands.Tests
             {
                 resource.id = "cookies";
                 timed.id = "timed";
-                timed.triggerKind = IncrementalFramework.RuleTriggerKind.Time;
+                timed.triggerKind = IncrementalFramework.Economy.RuleTriggerKind.Time;
                 timed.triggerTime = 5;
                 timed.actions = new[]
                 { new RuleActionEntry { kind = RuleActionKind.GrantResource, targetId = "cookies", amount = "1" } };
                 manual.id = "manual";
-                manual.triggerKind = IncrementalFramework.RuleTriggerKind.Manual;
+                manual.triggerKind = IncrementalFramework.Economy.RuleTriggerKind.Manual;
                 manual.actions = new[]
                 { new RuleActionEntry { kind = RuleActionKind.GrantResource, targetId = "cookies", amount = "1" } };
                 content.resources = new[] { resource };
                 content.rules = new[] { timed, manual };
                 content.clickResource = resource;
-                var simulation = new IncrementalFramework.Simulation(ContentCompiler.Compile(content).Content);
+                var simulation = new IncrementalFramework.Progression.Simulation(ContentCompiler.Compile(content).Content);
                 Assert.That(simulation.AdvanceTo(4).Completed, Is.True);
                 Assert.That(simulation.GetResource("cookies").Balance, Is.EqualTo(BreakInfinity.BigDouble.Zero));
-                Assert.That(simulation.Execute(new IncrementalFramework.TriggerRuleCommand("manual")).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.TriggerRuleCommand("manual")).Success, Is.True);
                 Assert.That(simulation.AdvanceTo(4).Completed, Is.True);
                 Assert.That(simulation.GetResource("cookies").Balance, Is.EqualTo(BreakInfinity.BigDouble.One));
                 Assert.That(simulation.AdvanceTo(5).Completed, Is.True);
@@ -349,7 +356,7 @@ namespace IdleHands.Tests
                 resource.usePrestigePolicy = true;
                 producer.id = "cursor";
                 producer.usePrestigePolicy = true;
-                producer.prestigePolicy = IncrementalFramework.ResetPolicy.Transform;
+                producer.prestigePolicy = IncrementalFramework.Core.ResetPolicy.Transform;
                 producer.prestigeTransform = "0.5";
                 producer.productionPerSecond = new[] { new ResourceAmount { resource = resource, amount = "1" } };
                 content.resources = new[] { resource };
@@ -358,17 +365,17 @@ namespace IdleHands.Tests
                 content.prestigeMode = PrestigeMode.BalanceMultiplier;
                 content.prestigeSourceResource = resource;
                 content.prestigeThreshold = "10";
-                foreach (IncrementalFramework.ResetPolicy policy in Enum.GetValues(typeof(IncrementalFramework.ResetPolicy)))
+                foreach (IncrementalFramework.Core.ResetPolicy policy in Enum.GetValues(typeof(IncrementalFramework.Core.ResetPolicy)))
                 {
                     resource.prestigePolicy = policy;
-                    resource.prestigeTransform = policy == IncrementalFramework.ResetPolicy.Transform ? "0.5" : "1";
+                    resource.prestigeTransform = policy == IncrementalFramework.Core.ResetPolicy.Transform ? "0.5" : "1";
                     Assert.That(ContentCompiler.Compile(content).Content.Resources[0].PrestigePolicy, Is.EqualTo(policy));
                 }
-                resource.prestigePolicy = IncrementalFramework.ResetPolicy.Transform;
+                resource.prestigePolicy = IncrementalFramework.Core.ResetPolicy.Transform;
                 resource.prestigeTransform = "0.5";
-                var simulation = new IncrementalFramework.Simulation(ContentCompiler.Compile(content).Content);
-                Assert.That(simulation.Execute(new IncrementalFramework.BuyProducerCommand("cursor", 4)).Success, Is.True);
-                Assert.That(simulation.Execute(new IncrementalFramework.PrestigeCommand()).Success, Is.True);
+                var simulation = new IncrementalFramework.Progression.Simulation(ContentCompiler.Compile(content).Content);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.BuyProducerCommand("cursor", 4)).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.PrestigeCommand()).Success, Is.True);
                 Assert.That(simulation.GetResource("cookies").Balance, Is.EqualTo(new BreakInfinity.BigDouble(50)));
                 Assert.That(simulation.GetProducer("cursor").Owned, Is.EqualTo(2));
             }
@@ -394,7 +401,7 @@ namespace IdleHands.Tests
             {
                 resource.id = "credit";
                 resource.startingAmount = "-3";
-                resource.negativePolicy = IncrementalFramework.NegativeAmountPolicy.ClampToZero;
+                resource.negativePolicy = IncrementalFramework.Economy.NegativeAmountPolicy.ClampToZero;
                 producer.id = "cursor";
                 producer.costs = new[] { new ResourceAmount { resource = resource, amount = "2" } };
                 producer.productionPerSecond = new[] { new ResourceAmount { resource = resource, amount = "1" } };
@@ -402,15 +409,15 @@ namespace IdleHands.Tests
                 scheduledFlag.id = "scheduled";
                 changed.id = "on-change";
                 changed.useResourceThreshold = false;
-                changed.triggerKind = IncrementalFramework.RuleTriggerKind.ResourceChanged;
+                changed.triggerKind = IncrementalFramework.Economy.RuleTriggerKind.ResourceChanged;
                 changed.triggerTargetId = "credit";
                 changed.actions = new[]
                 { new RuleActionEntry { kind = RuleActionKind.SetFlag, targetId = "changed" } };
                 scheduled.id = "on-scheduled-grant";
                 scheduled.useResourceThreshold = false;
-                scheduled.triggerKind = IncrementalFramework.RuleTriggerKind.ScheduledEvent;
+                scheduled.triggerKind = IncrementalFramework.Economy.RuleTriggerKind.ScheduledEvent;
                 scheduled.filterScheduledEvent = true;
-                scheduled.scheduledEventKind = IncrementalFramework.ScheduledEventTriggerKind.GrantResource;
+                scheduled.scheduledEventKind = IncrementalFramework.Economy.ScheduledEventTriggerKind.GrantResource;
                 scheduled.actions = new[]
                 { new RuleActionEntry { kind = RuleActionKind.SetFlag, targetId = "scheduled" } };
                 content.resources = new[] { resource };
@@ -419,16 +426,16 @@ namespace IdleHands.Tests
                 content.rules = new[] { changed, scheduled };
                 content.clickResource = resource;
                 Assert.That(ContentCompiler.Compile(content).Content.Resources[0].Initial, Is.EqualTo(BreakInfinity.BigDouble.Zero));
-                resource.negativePolicy = IncrementalFramework.NegativeAmountPolicy.Reject;
+                resource.negativePolicy = IncrementalFramework.Economy.NegativeAmountPolicy.Reject;
                 Assert.Throws<ContentValidationException>(() => ContentCompiler.Compile(content));
-                resource.negativePolicy = IncrementalFramework.NegativeAmountPolicy.Allow;
-                var simulation = new IncrementalFramework.Simulation(ContentCompiler.Compile(content).Content);
+                resource.negativePolicy = IncrementalFramework.Economy.NegativeAmountPolicy.Allow;
+                var simulation = new IncrementalFramework.Progression.Simulation(ContentCompiler.Compile(content).Content);
                 Assert.That(simulation.GetResource("credit").Balance, Is.EqualTo(new BreakInfinity.BigDouble(-3)));
-                Assert.That(simulation.Execute(new IncrementalFramework.BuyProducerCommand("cursor")).Success, Is.True);
+                Assert.That(simulation.Execute(new IncrementalFramework.Progression.BuyProducerCommand("cursor")).Success, Is.True);
                 Assert.That(simulation.GetResource("credit").Balance, Is.EqualTo(new BreakInfinity.BigDouble(-5)));
                 Assert.That(simulation.AdvanceTo(0).Completed, Is.True);
                 Assert.That(simulation.GetFlag("changed"), Is.True);
-                simulation.Schedule(new IncrementalFramework.GrantResourceCommand("credit", 1), 0);
+                simulation.Schedule(new IncrementalFramework.Progression.GrantResourceCommand("credit", 1), 0);
                 Assert.That(simulation.AdvanceTo(0).Completed, Is.True);
                 Assert.That(simulation.GetFlag("scheduled"), Is.True);
                 Assert.That(simulation.GetResource("credit").Balance, Is.EqualTo(new BreakInfinity.BigDouble(-4)));
@@ -454,7 +461,7 @@ namespace IdleHands.Tests
             {
                 resource.id = "cookies";
                 resource.startingAmount = "1e2e3";
-                resource.negativePolicy = (IncrementalFramework.NegativeAmountPolicy)999;
+                resource.negativePolicy = (IncrementalFramework.Economy.NegativeAmountPolicy)999;
                 content.resources = new[] { resource, resource };
                 content.clickAmount = "NaN";
                 var errors = ContentCompiler.Validate(content);

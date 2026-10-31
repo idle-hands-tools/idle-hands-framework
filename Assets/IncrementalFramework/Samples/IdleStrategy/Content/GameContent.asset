@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1000000000000000000000000000005, type: 3}
+  m_Name: GameContent
+  m_EditorClassIdentifier:
+  title: "FRONTIER COUNCIL / IDLE STRATEGY"
+  introduction: "Build farms and lumber camps, then recruit an army. Spend supplies and troops to claim three territories. Choose economic growth or faster expansion. Unite the frontier to win; prestige for +20% output per legacy. Scroll for campaigns and saves."
+  clickLabel: Gather
+  producersLabel: SETTLEMENT / INVEST RESOURCES
+  upgradesLabel: RESEARCH / DOUBLE OUTPUT
+  rulesLabel: CAMPAIGN / ONE CLAIM PER TERRITORY
+  accentColor: {r: 0.13, g: 0.36, b: 0.32, a: 1}
+  resources:
+  - {fileID: 11400000, guid: 568f294608684ce58fd55254376d30ab, type: 2}
+  - {fileID: 11400000, guid: fd1c809dfeb042a0b5bea172b4761f17, type: 2}
+  - {fileID: 11400000, guid: 4c894ebec8604bd0b9dd15b1c9725d00, type: 2}
+  - {fileID: 11400000, guid: ec8cb9be6adb4ad5928c7ed07ca64960, type: 2}
+  - {fileID: 11400000, guid: 93e4034053264d838b2045831ebc378b, type: 2}
+  producers:
+  - {fileID: 11400000, guid: e1f3030a26b74f48bfa9378add44fa1a, type: 2}
+  - {fileID: 11400000, guid: 0190ed78aa8e4a21a468e257715bc552, type: 2}
+  - {fileID: 11400000, guid: 366012c2a9d1484b836ea0269bde3854, type: 2}
+  - {fileID: 11400000, guid: eb329a399c6945018556db2f708ebf99, type: 2}
+  upgrades:
+  - {fileID: 11400000, guid: 189394a9b48041ff987f62727a5840de, type: 2}
+  - {fileID: 11400000, guid: 4fabe6f25ed64540804154993c427da8, type: 2}
+  - {fileID: 11400000, guid: c158680fab5e447b9008d9e47fbba90c, type: 2}
+  rules:
+  - {fileID: 11400000, guid: 9fd3eb09008f43c68abf844846175ad6, type: 2}
+  - {fileID: 11400000, guid: 82d5ccd1e69b4b638c393f3cf61dd299, type: 2}
+  - {fileID: 11400000, guid: 5d6f026459784f07affe5d140a723746, type: 2}
+  clickResource: {fileID: 11400000, guid: 568f294608684ce58fd55254376d30ab, type: 2}
+  clickAmount: 1
+  prestigeMode: 1
+  prestigeSourceResource: {fileID: 11400000, guid: 568f294608684ce58fd55254376d30ab, type: 2}
+  prestigeRewardResource: {fileID: 11400000, guid: 93e4034053264d838b2045831ebc378b, type: 2}
+  prestigeThreshold: 2500
+  prestigeRewardExponent: 0.5
+  prestigeRewardMultiplier: 1
+  prestigeProductionBonus: 0.2
+  prestigeResetProducers: 1
+  prestigeResetUpgrades: 1
+  maximumOfflineSeconds: 28800

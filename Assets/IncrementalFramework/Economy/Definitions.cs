@@ -1,8 +1,9 @@
+using IncrementalFramework.Core;
 using System;
 using System.Collections.Generic;
 using BreakInfinity;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Economy
 {
     public static class Number
     {
@@ -32,16 +33,18 @@ namespace IncrementalFramework
                 throw new ArithmeticException("Invalid nonnegative multiplication.");
             if (left == BigDouble.Zero || right == BigDouble.Zero) return BigDouble.Zero;
             double mantissa = left.Mantissa * right.Mantissa;
-            bool normalize = mantissa >= 10;
+            // The port may construct a mantissa just below one when Log10 rounds a fractional
+            // double at a power-of-ten boundary. Match its actual normalization in both directions.
+            long normalization = BigDouble.Normalize(mantissa, 0).Exponent;
             long exponent;
             try
             {
                 exponent = checked(left.Exponent + right.Exponent);
-                if (normalize) exponent = checked(exponent + 1);
+                exponent = checked(exponent + normalization);
             }
             catch (OverflowException error)
             {
-                decimal exactExponent = (decimal)left.Exponent + right.Exponent + (normalize ? 1 : 0);
+                decimal exactExponent = (decimal)left.Exponent + right.Exponent + normalization;
                 if (exactExponent < long.MinValue) return BigDouble.Zero;
                 if (exactExponent > long.MaxValue) throw new ArithmeticException("BigDouble exponent overflows.", error);
                 exponent = (long)exactExponent;
@@ -100,7 +103,7 @@ namespace IncrementalFramework
         }
     }
 
-    public sealed class ResourceAmount
+    public sealed class ResourceAmount : IImmutableValue
     {
         public string ResourceId { get; }
         public BigDouble Amount { get; }
@@ -110,16 +113,18 @@ namespace IncrementalFramework
 
     public enum NegativeAmountPolicy { Reject, ClampToZero, Allow }
 
-    public sealed class ResourceDefinition
+    public sealed class ResourceDefinition : EntityTemplate
     {
-        public string Id { get; }
-        public BigDouble Initial { get; }
-        public BigDouble? Cap { get; }
-        public bool ResetOnPrestige { get; }
-        public string Category { get; }
-        public ResetPolicy PrestigePolicy { get; }
-        public BigDouble PrestigeTransform { get; }
-        public NegativeAmountPolicy NegativeAmountPolicy { get; }
+        public override string InstanceKind => "resource";
+        protected override void InitializeInstance(EntityInstance instance) { instance.Define("Balance",Initial);instance.Define("Rate",BigDouble.Zero).Calculate(_=>BigDouble.Zero);instance.Define("LifetimeEarned",BigDouble.Max(BigDouble.Zero,Initial)); }
+
+        public BigDouble Initial { get => Get<BigDouble>(nameof(Initial)); set => Set(nameof(Initial), value); }
+        public BigDouble? Cap { get => Get<BigDouble?>(nameof(Cap)); set => Set(nameof(Cap), value); }
+        public bool ResetOnPrestige { get => Get<bool>(nameof(ResetOnPrestige)); set => Set(nameof(ResetOnPrestige), value); }
+        public string Category { get => Get<string>(nameof(Category)); set => Set(nameof(Category), value); }
+        public ResetPolicy PrestigePolicy { get => Get<ResetPolicy>(nameof(PrestigePolicy)); set => Set(nameof(PrestigePolicy), value); }
+        public BigDouble PrestigeTransform { get => Get<BigDouble>(nameof(PrestigeTransform)); set => Set(nameof(PrestigeTransform), value); }
+        public NegativeAmountPolicy NegativeAmountPolicy { get => Get<NegativeAmountPolicy>(nameof(NegativeAmountPolicy)); set => Set(nameof(NegativeAmountPolicy), value); }
         public ResourceDefinition(string id, BigDouble initial = default, BigDouble? cap = null, bool resetOnPrestige = true, string category = null,
             ResetPolicy? prestigePolicy = null, BigDouble? prestigeTransform = null, NegativeAmountPolicy negativeAmountPolicy = NegativeAmountPolicy.Reject)
         {
@@ -142,18 +147,20 @@ namespace IncrementalFramework
         }
     }
 
-    public sealed class ProducerDefinition
+    public sealed class ProducerDefinition : EntityTemplate
     {
-        public string Id { get; }
-        public IReadOnlyList<ResourceAmount> Costs { get; }
-        public IReadOnlyList<ResourceAmount> Production { get; }
-        public double CostGrowth { get; }
-        public bool InitiallyUnlocked { get; }
-        public IReadOnlyList<RequirementDefinition> Prerequisites { get; }
-        public ConditionDefinition PrerequisiteCondition { get; }
-        public string Category { get; }
-        public ResetPolicy? PrestigePolicy { get; }
-        public BigDouble PrestigeTransform { get; }
+        public override string InstanceKind => "producer";
+        protected override void InitializeInstance(EntityInstance instance) { instance.Define("Owned",0L);instance.Define("Enabled",true);instance.Define("Unlocked",InitiallyUnlocked); }
+
+        public IReadOnlyList<ResourceAmount> Costs { get => Get<IReadOnlyList<ResourceAmount>>(nameof(Costs)); set => SetList(nameof(Costs), value); }
+        public IReadOnlyList<ResourceAmount> Production { get => Get<IReadOnlyList<ResourceAmount>>(nameof(Production)); set => SetList(nameof(Production), value); }
+        public double CostGrowth { get => Get<double>(nameof(CostGrowth)); set => Set(nameof(CostGrowth), value); }
+        public bool InitiallyUnlocked { get => Get<bool>(nameof(InitiallyUnlocked)); set => Set(nameof(InitiallyUnlocked), value); }
+        public IReadOnlyList<RequirementDefinition> Prerequisites { get => Get<IReadOnlyList<RequirementDefinition>>(nameof(Prerequisites)); set => SetList(nameof(Prerequisites), value); }
+        public ConditionDefinition PrerequisiteCondition { get => Get<ConditionDefinition>(nameof(PrerequisiteCondition)); set => Set(nameof(PrerequisiteCondition), value); }
+        public string Category { get => Get<string>(nameof(Category)); set => Set(nameof(Category), value); }
+        public ResetPolicy? PrestigePolicy { get => Get<ResetPolicy?>(nameof(PrestigePolicy)); set => Set(nameof(PrestigePolicy), value); }
+        public BigDouble PrestigeTransform { get => Get<BigDouble>(nameof(PrestigeTransform)); set => Set(nameof(PrestigeTransform), value); }
         public ProducerDefinition(string id, ResourceAmount[] costs, ResourceAmount[] production, double costGrowth = 1.15, bool initiallyUnlocked = true,
             RequirementDefinition[] prerequisites = null, string category = null, ResetPolicy? prestigePolicy = null, BigDouble? prestigeTransform = null,
             ConditionDefinition prerequisiteCondition = null)
@@ -174,9 +181,8 @@ namespace IncrementalFramework
     public enum ModifierKind { Multiply, Add, AddPercent = Add, Flat, Override }
     public enum ModifierTarget { ProducerProduction, ResourceProduction, GlobalProduction, Click, ResourceCategoryProduction, ProducerCategoryProduction }
 
-    public sealed class ModifierDefinition
+    public sealed class ModifierDefinition : Modifier
     {
-        public string Id { get; }
         public string TargetProducerId { get; }
         public string TargetId { get; }
         public ModifierTarget Target { get; }
@@ -198,17 +204,26 @@ namespace IncrementalFramework
             if (kind == ModifierKind.Multiply || kind == ModifierKind.Override) Number.NonNegative(multiplier, nameof(multiplier));
             Value = multiplier; Kind = kind; Priority = priority;
         }
+        public override void Stage(EntityInstance target, EntityTransaction transaction)
+        {
+            BigDoubleNumeric.Register();
+            var operation = Kind == ModifierKind.Flat ? NumericOperation.Flat : Kind == ModifierKind.Add ? NumericOperation.AddPercent
+                : Kind == ModifierKind.Override ? NumericOperation.Override : NumericOperation.Multiply;
+            new NumericModifier<BigDouble>(Id, Id, new PropertyKey<BigDouble>("Rate"), operation, Value, Priority).Stage(target, transaction);
+        }
     }
 
-    public sealed class UpgradeDefinition
+    public sealed class UpgradeDefinition : EntityTemplate
     {
-        public string Id { get; }
-        public IReadOnlyList<ResourceAmount> Costs { get; }
-        public IReadOnlyList<ModifierDefinition> Modifiers { get; }
-        public bool Permanent { get; }
-        public bool InitiallyUnlocked { get; }
-        public IReadOnlyList<RequirementDefinition> Prerequisites { get; }
-        public ConditionDefinition PrerequisiteCondition { get; }
+        public override string InstanceKind => "upgrade";
+        protected override void InitializeInstance(EntityInstance instance) { instance.Define("Purchased",false);instance.Define("Unlocked",InitiallyUnlocked); }
+
+        public IReadOnlyList<ResourceAmount> Costs { get => Get<IReadOnlyList<ResourceAmount>>(nameof(Costs)); set => SetList(nameof(Costs), value); }
+        public IReadOnlyList<ModifierDefinition> Modifiers { get => Get<IReadOnlyList<ModifierDefinition>>(nameof(Modifiers)); set => SetList(nameof(Modifiers), value); }
+        public bool Permanent { get => Get<bool>(nameof(Permanent)); set => Set(nameof(Permanent), value); }
+        public bool InitiallyUnlocked { get => Get<bool>(nameof(InitiallyUnlocked)); set => Set(nameof(InitiallyUnlocked), value); }
+        public IReadOnlyList<RequirementDefinition> Prerequisites { get => Get<IReadOnlyList<RequirementDefinition>>(nameof(Prerequisites)); set => SetList(nameof(Prerequisites), value); }
+        public ConditionDefinition PrerequisiteCondition { get => Get<ConditionDefinition>(nameof(PrerequisiteCondition)); set => Set(nameof(PrerequisiteCondition), value); }
         public UpgradeDefinition(string id, ResourceAmount[] costs, ModifierDefinition[] modifiers, bool permanent = false, bool initiallyUnlocked = true,
             RequirementDefinition[] prerequisites = null, ConditionDefinition prerequisiteCondition = null)
         {
@@ -221,7 +236,7 @@ namespace IncrementalFramework
     }
 
     public enum RequirementKind { Resource, LifetimeResource, Producer, Upgrade, Prestige }
-    public sealed class RequirementDefinition
+    public sealed class RequirementDefinition : IImmutableValue
     {
         public RequirementKind Kind { get; }
         public string TargetId { get; }
@@ -233,16 +248,18 @@ namespace IncrementalFramework
             Number.NonNegative(amount, nameof(amount)); Kind = kind; TargetId = targetId; Amount = amount;
         }
     }
-        public sealed class FlagDefinition
-        {
-            public string Id { get; }
-            public bool Initial { get; }
-            public bool ResetOnPrestige { get; }
+        public sealed class FlagDefinition : EntityTemplate
+    {
+        public override string InstanceKind => "flag";
+        protected override void InitializeInstance(EntityInstance instance) { instance.Define("Value",Initial); }
+
+            public bool Initial { get => Get<bool>(nameof(Initial)); set => Set(nameof(Initial), value); }
+            public bool ResetOnPrestige { get => Get<bool>(nameof(ResetOnPrestige)); set => Set(nameof(ResetOnPrestige), value); }
             public FlagDefinition(string id, bool initial = false, bool resetOnPrestige = true)
             { Id = Number.Id(id); Initial = initial; ResetOnPrestige = resetOnPrestige; }
         }
         public enum ConditionKind { Requirement, Flag, And, Or, Not }
-        public sealed class ConditionDefinition
+        public sealed class ConditionDefinition : IImmutableValue
         {
             public ConditionKind Kind { get; }
             public RequirementDefinition Requirement { get; }
@@ -271,7 +288,23 @@ namespace IncrementalFramework
             }
         }
 
-    public abstract class RuleAction { }
+    public abstract class RuleAction : Modifier
+    {
+        public override void Stage(EntityInstance target, EntityTransaction transaction)
+        {
+            BigDoubleNumeric.Register();
+            if (this is GrantResourceAction grant)
+            { var value = target.GetValue<BigDouble>("Balance"); transaction.Set(value, transaction.Read(value) + grant.Amount); }
+            else if (this is SpendResourceAction spend)
+            { var value = target.GetValue<BigDouble>("Balance"); var before = transaction.Read(value); if (before < spend.Amount) throw new ArgumentException("Insufficient resources."); transaction.Set(value, before - spend.Amount); }
+            else if (this is UnlockProducerAction || this is UnlockUpgradeAction) transaction.Set(target.GetValue<bool>("Unlocked"), true);
+            else if (this is SetFlagAction flag) transaction.Set(target.GetValue<bool>("Value"), flag.Value);
+            else if (this is SetModifierAction modifier) transaction.Set(target.GetValue<bool>("Enabled"), modifier.Enabled);
+            else if (this is ScheduleGrantResourceAction scheduled)
+                transaction.OnCommit(() => target.Context.Schedule(new GrantResourceAction(scheduled.ResourceId, scheduled.Amount), target, scheduled.Delay));
+            else throw new ArgumentException("Unsupported modifier action.");
+        }
+    }
     public sealed class GrantResourceAction : RuleAction
     {
         public string ResourceId { get; }
@@ -289,18 +322,20 @@ namespace IncrementalFramework
         public string UpgradeId { get; }
         public UnlockUpgradeAction(string upgradeId) { UpgradeId = Number.Id(upgradeId); }
     }
-    public sealed class RuleDefinition
+    public sealed class RuleDefinition : EntityTemplate
     {
-        public string Id { get; }
-        public string ResourceId { get; }
-        public BigDouble Threshold { get; }
-        public IReadOnlyList<RuleAction> Actions { get; }
-        public bool Repeat { get; }
-        public double Cooldown { get; }
-        public bool ResetOnPrestige { get; }
-        public IReadOnlyList<RequirementDefinition> Conditions { get; }
-        public ConditionDefinition Condition { get; }
-        public RuleTriggerDefinition Trigger { get; }
+        public override string InstanceKind => "rule";
+        protected override void InitializeInstance(EntityInstance instance) { instance.Define("Fired",false);instance.Define("Disabled",false);instance.Define("NextEligible",0d); }
+
+        public string ResourceId { get => Get<string>(nameof(ResourceId)); set => Set(nameof(ResourceId), value); }
+        public BigDouble Threshold { get => Get<BigDouble>(nameof(Threshold)); set => Set(nameof(Threshold), value); }
+        public IReadOnlyList<RuleAction> Actions { get => Get<IReadOnlyList<RuleAction>>(nameof(Actions)); set => SetList(nameof(Actions), value); }
+        public bool Repeat { get => Get<bool>(nameof(Repeat)); set => Set(nameof(Repeat), value); }
+        public double Cooldown { get => Get<double>(nameof(Cooldown)); set => Set(nameof(Cooldown), value); }
+        public bool ResetOnPrestige { get => Get<bool>(nameof(ResetOnPrestige)); set => Set(nameof(ResetOnPrestige), value); }
+        public IReadOnlyList<RequirementDefinition> Conditions { get => Get<IReadOnlyList<RequirementDefinition>>(nameof(Conditions)); set => SetList(nameof(Conditions), value); }
+        public ConditionDefinition Condition { get => Get<ConditionDefinition>(nameof(Condition)); set => Set(nameof(Condition), value); }
+        public RuleTriggerDefinition Trigger { get => Get<RuleTriggerDefinition>(nameof(Trigger)); set => Set(nameof(Trigger), value); }
         public RuleDefinition(string id, string resourceId, BigDouble threshold, RuleAction[] actions,
             bool repeat = false, double cooldown = 0, bool resetOnPrestige = true, RuleTriggerDefinition trigger = null)
         {
@@ -332,21 +367,22 @@ namespace IncrementalFramework
         }
     }
 
-    public sealed class PrestigeDefinition
+    public sealed class PrestigeDefinition : EntityTemplate
     {
-        public string ResourceId { get; }
-        public BigDouble Threshold { get; }
-        public BigDouble MultiplierPerPrestige { get; }
-        public bool ResetProducers { get; }
-        public bool ResetUpgrades { get; }
-        public string RewardResourceId { get; }
-        public double RewardExponent { get; }
-        public BigDouble RewardMultiplier { get; }
-        public BigDouble ProductionBonusPerReward { get; }
+        public string ResourceId { get => Get<string>(nameof(ResourceId)); set => Set(nameof(ResourceId), value); }
+        public BigDouble Threshold { get => Get<BigDouble>(nameof(Threshold)); set => Set(nameof(Threshold), value); }
+        public BigDouble MultiplierPerPrestige { get => Get<BigDouble>(nameof(MultiplierPerPrestige)); set => Set(nameof(MultiplierPerPrestige), value); }
+        public bool ResetProducers { get => Get<bool>(nameof(ResetProducers)); set => Set(nameof(ResetProducers), value); }
+        public bool ResetUpgrades { get => Get<bool>(nameof(ResetUpgrades)); set => Set(nameof(ResetUpgrades), value); }
+        public string RewardResourceId { get => Get<string>(nameof(RewardResourceId)); set => Set(nameof(RewardResourceId), value); }
+        public double RewardExponent { get => Get<double>(nameof(RewardExponent)); set => Set(nameof(RewardExponent), value); }
+        public BigDouble RewardMultiplier { get => Get<BigDouble>(nameof(RewardMultiplier)); set => Set(nameof(RewardMultiplier), value); }
+        public BigDouble ProductionBonusPerReward { get => Get<BigDouble>(nameof(ProductionBonusPerReward)); set => Set(nameof(ProductionBonusPerReward), value); }
         public bool UsesLifetimeReward => RewardResourceId != null;
         public PrestigeDefinition(string resourceId, BigDouble threshold, BigDouble multiplierPerPrestige,
             bool resetProducers = true, bool resetUpgrades = true)
         {
+            Id = "prestige";
             ResourceId = Number.Id(resourceId); Number.NonNegative(threshold, nameof(threshold));
             if (threshold <= BigDouble.Zero || !Number.IsFinite(multiplierPerPrestige) || multiplierPerPrestige < BigDouble.One)
                 throw new ArgumentOutOfRangeException(nameof(multiplierPerPrestige));

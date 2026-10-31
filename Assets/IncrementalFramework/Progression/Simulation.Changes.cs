@@ -1,8 +1,10 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
 using System;
 using System.Collections.Generic;
 using BreakInfinity;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Progression
 {
     public enum SimulationChangeKind { Resource, Producer, Upgrade, Flag, Modifier, Prestige, Module }
 
@@ -50,6 +52,7 @@ namespace IncrementalFramework
         private readonly Dictionary<(object, int), (string Id, object Before, object After)> moduleChanges =
             new Dictionary<(object, int), (string, object, object)>();
         private bool journalReady;
+        private bool publishingEntityValues;
         private bool notifying;
         private List<SimulationChange> publishDeltas = new List<SimulationChange>();
         private List<SimulationChange> scratchDeltas = new List<SimulationChange>();
@@ -123,7 +126,7 @@ namespace IncrementalFramework
         }
         private void PublishChanges()
         {
-            if (changeBefore.Count == 0 && moduleChanges.Count == 0) return;
+            if (publishingEntityValues || (changeBefore.Count == 0 && moduleChanges.Count == 0)) return;
             // Snapshot only when observed; headless advances reuse the indexed journal storage.
             scratchDeltas.Clear();
             foreach (var pair in changeBefore)
@@ -138,6 +141,19 @@ namespace IncrementalFramework
                         pair.Key.Item1));
             changeBefore.Clear(); moduleChanges.Clear();
             if (scratchDeltas.Count == 0) return;
+            publishingEntityValues = true;
+            try
+            {
+            using (Entities.Batch())
+            foreach (var delta in scratchDeltas)
+            {
+                Entity entity = delta.Kind == SimulationChangeKind.Resource ? Resources[delta.Index]
+                    : delta.Kind == SimulationChangeKind.Producer ? (Entity)Producers[delta.Index]
+                    : delta.Kind == SimulationChangeKind.Upgrade ? Upgrades[delta.Index] : null;
+                if (entity != null) foreach (var value in entity.Values.Values) value.Refresh();
+            }
+            }
+            finally { publishingEntityValues = false; }
             var previous = publishDeltas; publishDeltas = scratchDeltas; scratchDeltas = previous;
             lastChangeTime = Time; pendingChangesSnapshot = true;
             if (Changed == null) return;

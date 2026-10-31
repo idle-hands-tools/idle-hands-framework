@@ -1,12 +1,24 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using UnityEngine;
 
-namespace IdleHands.UnityIntegration
+namespace IncrementalFramework.Unity
 {
     public enum PrestigeMode { BalanceMultiplier, LifetimeCurrency }
 
     [CreateAssetMenu(menuName = "Idle Hands/Game Content")]
     public sealed class GameContentAsset : ScriptableObject
     {
+        [Header("Presentation")]
+        public string title = "IDLE HANDS / COOKIE BAKERY";
+        [TextArea] public string introduction = "Bake cookies, hire cursors, unlock ovens, then prestige. Scroll for more.";
+        public string clickLabel = "Bake";
+        public string producersLabel = "PRODUCERS";
+        public string upgradesLabel = "UPGRADES";
+        public string rulesLabel = "MILESTONES";
+        public Color accentColor = new Color(0.19f, 0.28f, 0.43f);
         public ResourceAsset[] resources = new ResourceAsset[0];
         public ProducerAsset[] producers = new ProducerAsset[0];
         public UpgradeAsset[] upgrades = new UpgradeAsset[0];

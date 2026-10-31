@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Core
 {
     /// <summary>Stable binary min-heap with lazy versioned cancellation and amortized tombstone compaction.</summary>
     public sealed class EventScheduler<T>

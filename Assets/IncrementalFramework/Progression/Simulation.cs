@@ -1,9 +1,12 @@
+using System.Linq;
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
 using System;
 using System.Collections.Generic;
 using System.Threading;
 using BreakInfinity;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Progression
 {
     /// <summary>The sole writer of runtime state. Commands and advances must run on its creating thread.</summary>
     public sealed partial class Simulation
@@ -29,8 +32,10 @@ namespace IncrementalFramework
         private readonly Dictionary<string, int> ruleIndices = new Dictionary<string, int>(StringComparer.Ordinal);
         private ulong randomState;
         private double? pendingTarget;
-        public ContentDatabase Content { get; }
-        public int EventBudget { get; }
+        public EntityContext Entities { get; } = new EntityContext();
+        public ContentDatabase Content { get; private set; }
+        public ContentDatabase InitialContent { get; }
+        public int EventBudget { get; private set; }
         public double Time { get; private set; }
         public double? PendingTarget => pendingTarget;
         public long PrestigeCount { get; private set; }
@@ -44,7 +49,11 @@ namespace IncrementalFramework
 
         public Simulation(ContentDatabase content, ulong seed = 1, int eventBudget = 10000)
         {
-            Content = content ?? throw new ArgumentNullException(nameof(content));
+            using var initialization = Entities.Batch();
+            BigDoubleNumeric.Register();
+            if(content==null)throw new ArgumentNullException(nameof(content));
+            InitialContent=content.CopyForSimulation();
+            Content=content.CopyForSimulation();content=Content;
             if (eventBudget < 1) throw new ArgumentOutOfRangeException(nameof(eventBudget));
             EventBudget = eventBudget; randomState = seed == 0 ? 1 : seed;
             balances = new BigDouble[content.Resources.Count]; rates = new BigDouble[balances.Length];
@@ -68,25 +77,96 @@ namespace IncrementalFramework
             {
                 int index = i; balances[i] = content.Resources[i].Initial; lifetime[i] = BigDouble.Max(BigDouble.Zero, balances[i]);
                 resourceViews[i] = new ResourceView(content.Resources[i].Id, content.Resources[i].Cap,
-                    () => balances[index], () => EffectiveRate(index), () => lifetime[index]);
+                    () => balances[index], () => EffectiveRate(index), () => lifetime[index],
+                    value => DirectResource(index, value, 0), value => DirectResource(index, value, 1), value => DirectResource(index, value, 2), Entities);
             }
             for (int i = 0; i < owned.Length; i++)
             {
                 int index = i; enabled[i] = true; producerUnlocked[i] = content.Producers[i].InitiallyUnlocked;
-                producerViews[i] = new ProducerView(content.Producers[i].Id, () => owned[index], () => enabled[index], () => producerUnlocked[index]);
+                producerViews[i] = new ProducerView(content.Producers[i].Id, () => owned[index], () => enabled[index], () => producerUnlocked[index],
+                    value => DirectProducer(index, value, null, null), value => DirectProducer(index, null, value, null), value => DirectProducer(index, null, null, value), Entities);
             }
             for (int i = 0; i < purchased.Length; i++)
             {
                 int index = i; upgradeUnlocked[i] = content.Upgrades[i].InitiallyUnlocked;
-                upgradeViews[i] = new UpgradeView(content.Upgrades[i].Id, () => purchased[index], () => upgradeUnlocked[index]);
+                upgradeViews[i] = new UpgradeView(content.Upgrades[i].Id, () => purchased[index], () => upgradeUnlocked[index],
+                    value => DirectUpgrade(index, value, null), value => DirectUpgrade(index, null, value), Entities);
             }
             Resources = Array.AsReadOnly(resourceViews); Producers = Array.AsReadOnly(producerViews); Upgrades = Array.AsReadOnly(upgradeViews);
             for (int i = 0; i < ruleFired.Length; i++) ruleIndices.Add(content.Rules[i].Id, i);
+            for(int i=0;i<Resources.Count;i++) BindConfiguration(Content.Resources[i],Resources[i]);
+            for(int i=0;i<Producers.Count;i++) BindConfiguration(Content.Producers[i],Producers[i]);
+            for(int i=0;i<Upgrades.Count;i++) BindConfiguration(Content.Upgrades[i],Upgrades[i]);
             RebuildAllRates();
             RefreshAllRules();
+            for (int i = 0; i < Resources.Count; i++)
+            { int index = i; Resources[i].GetValue<BigDouble>("Rate").Calculate(_ => CalculateObservedRate(index)); }
+            Entities.RandomOverride = NextRandomUInt64;
             journalReady = true;
+            Entities.ValueChanged += (value, before, after) => PublishChanges();
+            Entities.Scheduler = (modifier, target, delay) =>
+            {
+                if (modifier is GrantResourceAction grant) Schedule(new GrantResourceCommand(grant.ResourceId, grant.Amount), Time + delay);
+                else throw new ArgumentException("Unsupported scheduled modifier.");
+            };
         }
 
+        private void BindConfiguration(EntityTemplate definition, EntityInstance instance)
+        {
+            definition.CopyValuesTo(instance);
+            foreach(var pair in definition.Values)
+            {
+                string name=pair.Key;var source=pair.Value;
+                instance.GetValue(name).BindStorage(()=>source.Boxed,value=>
+                {
+                    source.Boxed=value;
+                    Content=new ContentDatabase(Content.Resources.ToArray(),Content.Producers.ToArray(),Content.Upgrades.ToArray(),Content.Rules.ToArray(),Content.Prestige,Content.Flags.ToArray(),Content.Modifiers.ToArray());
+                    RebuildAllRates();RefreshAllRules();
+                });
+            }
+        }
+
+        private BigDouble CalculateObservedRate(int index)
+        {
+            foreach(int producer in Content.ProducersForResource(index))
+            {
+                _ = Producers[producer].Owned; _ = Producers[producer].Enabled;
+                foreach(int upgrade in Content.UpgradesForProducer(producer)) _ = Upgrades[upgrade].Purchased;
+            }
+            var cap = Resources[index].Cap;
+            if(cap.HasValue && Resources[index].Balance >= cap.Value) return BigDouble.Zero;
+            BigDouble rate = BigDouble.Zero;
+            foreach(int producer in Content.ProducersForResource(index))
+                foreach(var output in Content.ProducerOutputs(producer))
+                    if(output.ResourceIndex == index) rate = Number.Add(rate, Contribution(producer,index,output.Amount,producerFactors[producer]));
+            return rate;
+        }
+
+        public void AcceptRestoredEntities()
+        { changeBefore.Clear(); moduleChanges.Clear(); RebuildAllRates(); RefreshAllRules(); changeBefore.Clear(); }
+
+        private void DirectResource(int index, BigDouble value, int field)
+        {
+            if((field==0?balances[index]:field==1?rates[index]:lifetime[index])==value)return;
+            Mark(SimulationChangeKind.Resource,index);
+            if(field==0){var previous=balances[index];balances[index]=value;if(value>previous)lifetime[index]=Number.Add(lifetime[index],value-previous);RefreshRules(index);}
+            else if(field==1)rates[index]=value;else lifetime[index]=value;
+
+        }
+        private void DirectProducer(int index,long? count,bool? active,bool? unlocked)
+        {
+            Mark(SimulationChangeKind.Producer,index);
+            if(count.HasValue)owned[index]=count.Value;if(active.HasValue)enabled[index]=active.Value;if(unlocked.HasValue)producerUnlocked[index]=unlocked.Value;
+            RefreshProducer(index);
+        }
+        private void DirectUpgrade(int index,bool? bought,bool? unlocked)
+        {
+            Mark(SimulationChangeKind.Upgrade,index);
+            if(bought.HasValue)purchased[index]=bought.Value;if(unlocked.HasValue)upgradeUnlocked[index]=unlocked.Value;
+            RebuildAllRates();RefreshAllRules();
+        }
+
+        public BigDouble ClickAmount(string resourceId, BigDouble amount) => clickModifiers[Content.ResourceIndex(resourceId)].Apply(amount);
         public ResourceView GetResource(string id) => Resources[Content.ResourceIndex(id)];
         /// <summary>Diagnostic only: includes initialization/rebuilds and is not persisted.</summary>
         public long RateRebuildCount(string resourceId) => rateRebuildCounts[Content.ResourceIndex(resourceId)];
@@ -110,6 +190,7 @@ namespace IncrementalFramework
         {
             var result = ExecuteCommand(command);
             FlushResourceTriggers();
+            if (result.Success) InvalidateWorkSources();
             return result;
         }
 
@@ -230,6 +311,26 @@ namespace IncrementalFramework
             finally { PublishChanges(); }
         }
 
+        /// <summary>Cooperatively advance to a declared behavior boundary inside an already prepared horizon.</summary>
+        public AdvanceResult AdvanceToBoundary(double target,int budget)
+        {
+            AssertWriter();
+            if(budget<1||!Finite(target)||target<Time)throw new ArgumentOutOfRangeException(nameof(target));
+            int savedBudget=EventBudget;double? savedTarget=pendingTarget,savedPrepared=systemsPreparedTarget;
+            bool shortened=savedTarget.HasValue&&target<savedTarget.Value;
+            try
+            {
+                EventBudget=Math.Min(savedBudget,budget);
+                if(shortened){pendingTarget=target;systemsPreparedTarget=target;}
+                return AdvanceCore(target);
+            }
+            finally
+            {
+                if(shortened){pendingTarget=savedTarget;systemsPreparedTarget=savedPrepared;}
+                EventBudget=savedBudget;PublishChanges();
+            }
+        }
+
         private AdvanceResult AdvanceCore(double target)
         {
             if (!Finite(target) || target < Time || (pendingTarget.HasValue && target < pendingTarget.Value))
@@ -247,14 +348,23 @@ namespace IncrementalFramework
                 double horizon = systemsPreparedTarget ?? target;
                 while (true)
                 {
-                    if (scheduler.NextStoredTime.HasValue && scheduler.NextStoredTime.Value > horizon) break;
-                    work += scheduler.PruneCancelled(EventBudget - work);
-                    if (scheduler.HasCancelledHead)
-                    {
-                        if (scheduler.NextStoredTime.Value > horizon) break;
+                    if (scheduler.NextStoredTime.HasValue && scheduler.NextStoredTime.Value > horizon && NextWorkSource(horizon) == null) break;
+                    if (scheduler.NextStoredTime.HasValue && scheduler.NextStoredTime.Value <= horizon)
+                        work += scheduler.PruneCancelled(EventBudget - work);
+                    if (scheduler.HasCancelledHead && scheduler.NextStoredTime.Value <= horizon)
                         return new AdvanceResult(false, Time, processed, work);
+                    ScheduledEvent<SimulationEvent> entry = null;
+                    bool hasNative = scheduler.NextStoredTime.HasValue && scheduler.NextStoredTime.Value <= horizon &&
+                        scheduler.TryPeek(out entry) && entry.Time <= horizon;
+                    var source = NextWorkSource(horizon);
+                    if (source != null && (!hasNative || source.NextTime.Value < entry.Time))
+                    {
+                        if (work == EventBudget) return new AdvanceResult(false, Time, processed, work, AdvanceDiagnostic.EventBudgetExhausted);
+                        Integrate(source.NextTime.Value);
+                        ProcessWorkSource(source); processed++; work++;
+                        continue;
                     }
-                    if (!scheduler.TryPeek(out var entry) || entry.Time > horizon) break;
+                    if (!hasNative) break;
                     if (work == EventBudget) return new AdvanceResult(false, Time, processed, work,
                         sameTime > 1 ? AdvanceDiagnostic.SameTimeCascade : AdvanceDiagnostic.EventBudgetExhausted);
                     Integrate(entry.Time);
@@ -262,9 +372,10 @@ namespace IncrementalFramework
                     sameTime = entry.Time == lastEventTime ? sameTime + 1 : 1;
                     lastEventTime = entry.Time;
                     Process(entry);
+                    InvalidateWorkSources();
                 }
                 Integrate(horizon);
-                if (scheduler.NextStoredTime.HasValue && scheduler.NextStoredTime.Value <= horizon) continue;
+                if (scheduler.NextStoredTime.HasValue && scheduler.NextStoredTime.Value <= horizon || NextWorkSource(horizon) != null) continue;
                 if (horizon == target) break;
                 // Finish the already-prepared interval before extending systems using its final state.
                 PrepareSystems(target);

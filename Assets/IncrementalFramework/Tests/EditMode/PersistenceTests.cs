@@ -1,7 +1,10 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using System;
 using System.IO;
 using BreakInfinity;
-using IncrementalFramework;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;

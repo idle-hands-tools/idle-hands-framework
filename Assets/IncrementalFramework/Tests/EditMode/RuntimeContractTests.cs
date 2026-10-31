@@ -1,8 +1,11 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using BreakInfinity;
-using IncrementalFramework;
 using NUnit.Framework;
 
 namespace IncrementalFrameworkTests
@@ -463,7 +466,7 @@ namespace IncrementalFrameworkTests
         }
 
         [Test]
-        public void UnobservedProductionJournalReusesStorageAndLazySnapshotsRemainImmutable()
+        public void ObservableProductionHasBoundedAllocationsAndLazySnapshotsRemainImmutable()
         {
             var simulation = new Simulation(Economy());
             simulation.Execute(new BuyProducerCommand("worker"));
@@ -471,7 +474,8 @@ namespace IncrementalFrameworkTests
             simulation.AdvanceTo(2);
             long before = GC.GetAllocatedBytesForCurrentThread();
             for (int i = 3; i < 103; i++) simulation.AdvanceTo(i);
-            Assert.That(GC.GetAllocatedBytesForCurrentThread() - before, Is.Zero);
+            // Observable Values publish boxed before/after values even without UI listeners.
+            Assert.That(GC.GetAllocatedBytesForCurrentThread() - before, Is.LessThan(100 * 1024));
             simulation.Execute(new ToggleProducerCommand("worker", true));
             var previous = simulation.LastChanges;
             Assert.That(previous.Time, Is.EqualTo(102));

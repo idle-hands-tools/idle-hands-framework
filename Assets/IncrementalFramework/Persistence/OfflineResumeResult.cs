@@ -1,8 +1,11 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
 using System;
 using System.Collections.Generic;
 using BreakInfinity;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Persistence
 {
     public sealed class OfflineResourceGain
     {
@@ -39,7 +42,7 @@ namespace IncrementalFramework
             Advance = Simulation.AdvanceTo(TargetTime);
             var gains = new OfflineResourceGain[before.Length];
             for (int i = 0; i < gains.Length; i++)
-                gains[i] = new OfflineResourceGain(Simulation.Resources[i].Id, before[i], Simulation.Resources[i].Balance);
+                gains[i] = new OfflineResourceGain(Simulation.Resources[i].TemplateId, before[i], Simulation.Resources[i].Balance);
             Gains = Array.AsReadOnly(gains);
             return Advance;
         }

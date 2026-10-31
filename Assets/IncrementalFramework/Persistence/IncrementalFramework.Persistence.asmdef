@@ -1,7 +1,17 @@
 {
   "name": "IncrementalFramework.Persistence",
-  "rootNamespace": "IncrementalFramework",
-  "references": ["IncrementalFramework.Core", "IncrementalFramework.Economy", "IncrementalFramework.Progression", "BreakInfinity", "Unity.Newtonsoft.Json"],
+  "rootNamespace": "IncrementalFramework.Persistence",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "BreakInfinity",
+    "IncrementalFramework.Definitions"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ],
   "autoReferenced": true,
   "noEngineReferences": true
 }

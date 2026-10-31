@@ -1,6 +1,9 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using System;
 using BreakInfinity;
-using IncrementalFramework;
 using NUnit.Framework;
 
 namespace IncrementalFrameworkTests

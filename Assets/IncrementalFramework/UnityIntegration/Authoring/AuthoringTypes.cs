@@ -1,7 +1,11 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using System;
 using UnityEngine;
 
-namespace IdleHands.UnityIntegration
+namespace IncrementalFramework.Unity
 {
     [Serializable]
     public sealed class ResourceAmount

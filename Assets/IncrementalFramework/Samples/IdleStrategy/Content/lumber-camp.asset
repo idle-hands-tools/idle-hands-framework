@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1000000000000000000000000000002, type: 3}
+  m_Name: lumber-camp
+  m_EditorClassIdentifier:
+  id: lumber-camp
+  displayName: "Lumber camp / +1 timber per sec"
+  category: idlestrategy
+  initiallyUnlocked: 1
+  costGrowth: 1.18
+  costs:
+  - resource: {fileID: 11400000, guid: 568f294608684ce58fd55254376d30ab, type: 2}
+    amount: 15
+  productionPerSecond:
+  - resource: {fileID: 11400000, guid: fd1c809dfeb042a0b5bea172b4761f17, type: 2}
+    amount: 1
+  prerequisites: []
+  rootConditionIndex: -1
+  prestigeTransform: 1

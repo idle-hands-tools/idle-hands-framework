@@ -1,8 +1,10 @@
+using System.Linq;
+using IncrementalFramework.Core;
 using System;
 using System.Collections.Generic;
 using BreakInfinity;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Economy
 {
     /// <summary>Validated, immutable definitions with dense ordinal indices and reverse dependency indices.</summary>
     public sealed class ContentDatabase
@@ -48,6 +50,18 @@ namespace IncrementalFramework
         private readonly IndexedCondition[] conditions;
         private readonly IReadOnlyList<int>[] flagRules;
         private readonly Dictionary<(RuleTriggerKind, int), IReadOnlyList<int>> triggerRules = new Dictionary<(RuleTriggerKind, int), IReadOnlyList<int>>();
+        public ContentDatabase CopyForSimulation()
+        {
+            var resources=Resources.Select(source=>{var copy=new ResourceDefinition(source.Id);source.CopyValuesTo(copy);return copy;}).ToArray();
+            var producers=Producers.Select(source=>{var copy=new ProducerDefinition(source.Id,null,null);source.CopyValuesTo(copy);return copy;}).ToArray();
+            var upgrades=Upgrades.Select(source=>{var copy=new UpgradeDefinition(source.Id,null,null);source.CopyValuesTo(copy);return copy;}).ToArray();
+            var rules=Rules.Select(source=>{var copy=new RuleDefinition(source.Id,Array.Empty<RequirementDefinition>(),null);source.CopyValuesTo(copy);return copy;}).ToArray();
+            var flags=Flags.Select(source=>{var copy=new FlagDefinition(source.Id);source.CopyValuesTo(copy);return copy;}).ToArray();
+            PrestigeDefinition prestige=null;
+            if(Prestige!=null){prestige=new PrestigeDefinition(Prestige.ResourceId,1,1);Prestige.CopyValuesTo(prestige);}
+            return new ContentDatabase(resources,producers,upgrades,rules,prestige,flags,Modifiers.ToArray());
+        }
+
         public ContentDatabase(ResourceDefinition[] resources, ProducerDefinition[] producers = null,
             UpgradeDefinition[] upgrades = null, RuleDefinition[] rules = null, PrestigeDefinition prestige = null, FlagDefinition[] flags = null,
             ModifierDefinition[] modifiers = null)

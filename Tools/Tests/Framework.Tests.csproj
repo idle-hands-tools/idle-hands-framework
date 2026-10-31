@@ -14,8 +14,15 @@
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
     <PackageReference Include="NUnit" Version="3.14.0" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <ProjectReference Include="../UI/IncrementalFramework.UI.csproj" />
+    <ProjectReference Include="../Tutorials/IncrementalFramework.Tutorials.csproj" />
     <ProjectReference Include="../Headless/Framework.Headless.csproj" />
+    <ProjectReference Include="../GuildRpg/IdleHands.GuildRpg.csproj" />
     <Compile Include="../../Assets/IncrementalFramework/Tests/EditMode/**/*.cs" />
+    <ProjectReference Include="../Clicker/IncrementalFramework.Games.Clicker.csproj" />
+    <ProjectReference Include="../Strategy/IncrementalFramework.Games.Strategy.csproj" />
+    <ProjectReference Include="../Samples/IdleRpg/IncrementalFramework.Samples.IdleRpg.csproj" />
+    <ProjectReference Include="../Samples/Expanded/IncrementalFramework.Samples.Expanded.csproj" />
   </ItemGroup>
 
 </Project>

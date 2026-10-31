@@ -1,8 +1,10 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
 using System;
 using System.Collections.Generic;
 using BreakInfinity;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Progression
 {
     // Detached DTOs are copied on both import and export; none are live writable simulation state.
     public sealed class SimulationState

@@ -1,8 +1,10 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
 using System;
 using System.Collections.Generic;
 using BreakInfinity;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Progression
 {
     public interface IGameModule
     {
@@ -13,6 +15,10 @@ namespace IncrementalFramework
     {
         CommandResult Build(T command, SimulationReadModel state, SimulationTransaction transaction);
     }
+
+    /// <summary>Optional metadata-only failure recording; the rejected transaction has already been discarded.</summary>
+    public interface ICommandFailureHandler<in T> where T : ISimulationCommand
+    { void RecordFailure(T command, CommandResult result, StateTransaction transaction); }
 
     public interface ISimulationSystem
     {
@@ -63,6 +69,7 @@ namespace IncrementalFramework
         internal readonly SortedDictionary<int, BigDouble> Costs = new SortedDictionary<int, BigDouble>();
         internal readonly SortedDictionary<int, BigDouble> Grants = new SortedDictionary<int, BigDouble>();
         internal readonly StateTransaction Values = new StateTransaction();
+        internal readonly List<IndexedRuleAction> Actions = new List<IndexedRuleAction>();
         private readonly ContentDatabase content;
         private bool sealedTransaction;
         internal SimulationTransaction(ContentDatabase content) { this.content = content; }
@@ -79,6 +86,24 @@ namespace IncrementalFramework
         public void Set<T>(DenseStateStore<T> store, int index, T value) where T : struct
         {
             EnsureOpen(); Values.Set(store, index, value);
+        }
+        /// <summary>Stage a native action with module state in the same atomic commit.</summary>
+        public void Stage(RuleAction action)
+        {
+            EnsureOpen();
+            if (action is GrantResourceAction grant) { if (grant.Amount < BigDouble.Zero && content.Resources[content.ResourceIndex(grant.ResourceId)].NegativeAmountPolicy == NegativeAmountPolicy.Reject) throw new ArgumentException("Negative grant is not allowed."); Actions.Add(new IndexedRuleAction(RuleActionKind.GrantResource, content.ResourceIndex(grant.ResourceId), grant.Amount)); }
+            else if (action is SpendResourceAction spend) Actions.Add(new IndexedRuleAction(RuleActionKind.SpendResource, content.ResourceIndex(spend.ResourceId), spend.Amount));
+            else if (action is SetFlagAction flag) Actions.Add(new IndexedRuleAction(RuleActionKind.SetFlag, content.FlagIndex(flag.FlagId), enabled: flag.Value));
+            else if (action is UnlockProducerAction producer) Actions.Add(new IndexedRuleAction(RuleActionKind.UnlockProducer, content.ProducerIndex(producer.ProducerId)));
+            else if (action is UnlockUpgradeAction upgrade) Actions.Add(new IndexedRuleAction(RuleActionKind.UnlockUpgrade, content.UpgradeIndex(upgrade.UpgradeId)));
+            else if (action is SetModifierAction modifier) Actions.Add(new IndexedRuleAction(RuleActionKind.SetModifier, content.ModifierIndex(modifier.ModifierId), enabled: modifier.Enabled));
+            else if (action is ScheduleGrantResourceAction scheduled)
+            {
+                int resource = content.ResourceIndex(scheduled.ResourceId);
+                if (scheduled.Amount < BigDouble.Zero && content.Resources[resource].NegativeAmountPolicy == NegativeAmountPolicy.Reject) throw new ArgumentException("Negative scheduled grant is not allowed.");
+                Actions.Add(new IndexedRuleAction(RuleActionKind.ScheduleGrantResource, resource, scheduled.Amount, delay: scheduled.Delay, priority: scheduled.Priority));
+            }
+            else throw new ArgumentException("Unsupported native action.", nameof(action));
         }
         private void Add(IDictionary<int, BigDouble> amounts, string id, BigDouble amount)
         {
@@ -103,6 +128,8 @@ namespace IncrementalFramework
         private readonly List<ProducerDefinition> producers = new List<ProducerDefinition>();
         private readonly List<UpgradeDefinition> upgrades = new List<UpgradeDefinition>();
         private readonly List<RuleDefinition> rules = new List<RuleDefinition>();
+        private readonly List<FlagDefinition> flags = new List<FlagDefinition>();
+        private readonly List<ModifierDefinition> modifiers = new List<ModifierDefinition>();
         private readonly List<Action<Simulation>> registrations = new List<Action<Simulation>>();
         private readonly List<ISnapshotSection> declaredSections = new List<ISnapshotSection>();
         private PrestigeDefinition prestige;
@@ -114,10 +141,14 @@ namespace IncrementalFramework
             if (module == null) throw new ArgumentNullException(nameof(module));
             module.Register(this); return this;
         }
+        public void Configure(Action<Simulation> setup) { EnsureOpen();registrations.Add(setup??throw new ArgumentNullException(nameof(setup))); }
+        public void Entity(EntityTemplate template) { EnsureOpen(); registrations.Add(simulation => simulation.Entities.RegisterTemplate(template)); }
         public void Resource(ResourceDefinition definition) { EnsureOpen(); resources.Add(definition); }
         public void Producer(ProducerDefinition definition) { EnsureOpen(); producers.Add(definition); }
         public void Upgrade(UpgradeDefinition definition) { EnsureOpen(); upgrades.Add(definition); }
         public void Rule(RuleDefinition definition) { EnsureOpen(); rules.Add(definition); }
+        public void Flag(FlagDefinition definition) { EnsureOpen(); flags.Add(definition); }
+        public void Modifier(ModifierDefinition definition) { EnsureOpen(); modifiers.Add(definition); }
         public void Prestige(PrestigeDefinition definition)
         {
             EnsureOpen();
@@ -156,7 +187,7 @@ namespace IncrementalFramework
             registrations.Add(simulation => simulation.RegisterResetParticipant(participant));
         }
         public ContentDatabase Compile() => new ContentDatabase(resources.ToArray(), producers.ToArray(),
-            upgrades.ToArray(), rules.ToArray(), prestige);
+            upgrades.ToArray(), rules.ToArray(), prestige, flags.ToArray(), modifiers.ToArray());
         public Simulation Create(ulong seed = 1, int eventBudget = 10000)
         {
             var simulation = new Simulation(Compile(), seed, eventBudget);
@@ -180,6 +211,7 @@ namespace IncrementalFramework
         private interface IRegisteredHandler
         {
             CommandResult Build(ISimulationCommand command, SimulationReadModel state, SimulationTransaction transaction);
+            void RecordFailure(ISimulationCommand command, CommandResult result, StateTransaction transaction);
         }
         private sealed class RegisteredHandler<T> : IRegisteredHandler where T : ISimulationCommand
         {
@@ -187,6 +219,8 @@ namespace IncrementalFramework
             public RegisteredHandler(ICommandHandler<T> handler) { this.handler = handler; }
             public CommandResult Build(ISimulationCommand command, SimulationReadModel state, SimulationTransaction transaction) =>
                 handler.Build((T)command, state, transaction);
+            public void RecordFailure(ISimulationCommand command, CommandResult result, StateTransaction transaction)
+            { if (handler is ICommandFailureHandler<T> recorder) recorder.RecordFailure((T)command, result, transaction); }
         }
         private readonly Dictionary<Type, IRegisteredHandler> commandHandlers = new Dictionary<Type, IRegisteredHandler>();
         private readonly List<ISimulationSystem> systems = new List<ISimulationSystem>();
@@ -258,32 +292,14 @@ namespace IncrementalFramework
             var transaction = new SimulationTransaction(Content);
             result = handler.Build(command, new SimulationReadModel(this), transaction);
             transaction.Seal();
-            if (!result.Success) return true;
-            foreach (var cost in transaction.Costs)
-                if (balances[cost.Key] < cost.Value && Content.Resources[cost.Key].NegativeAmountPolicy != NegativeAmountPolicy.Allow)
-                { result = CommandResult.Fail("Insufficient resources for module transaction."); return true; }
-            var stagedBalances = new SortedDictionary<int, BigDouble>();
-            var stagedLifetime = new SortedDictionary<int, BigDouble>();
-            foreach (var cost in transaction.Costs) stagedBalances[cost.Key] = Number.AddSigned(balances[cost.Key], -cost.Value);
-            foreach (var grant in transaction.Grants)
+            try { if (result.Success) result = CommitTransaction(transaction); }
+            catch (ArgumentException error) { result = CommandResult.Fail(error.Message); }
+            catch (ArithmeticException error) { result = CommandResult.Fail(error.Message); }
+            if (!result.Success)
             {
-                BigDouble beforeGrant = stagedBalances.TryGetValue(grant.Key, out var staged) ? staged : balances[grant.Key];
-                BigDouble afterGrant = GrantedBalance(grant.Key, beforeGrant, grant.Value);
-                stagedBalances[grant.Key] = afterGrant;
-                stagedLifetime[grant.Key] = EarnedAfter(grant.Key, beforeGrant, afterGrant);
+                var metadata = new StateTransaction(); handler.RecordFailure(command, result, metadata);
+                if (metadata.Commit()) CollectModuleChanges(metadata);
             }
-            if (!transaction.Values.Validate())
-            { result = CommandResult.Fail("Module typed-state transaction is stale."); return true; }
-            foreach (var value in stagedBalances)
-            {
-                Mark(SimulationChangeKind.Resource, value.Key);
-                if (balances[value.Key] != value.Value) changedResources.Add(value.Key);
-                balances[value.Key] = value.Value;
-            }
-            foreach (var value in stagedLifetime) lifetime[value.Key] = value.Value;
-            transaction.Values.Commit();
-            CollectModuleChanges(transaction.Values);
-            foreach (var value in stagedBalances) RefreshRules(value.Key);
             return true;
         }
         private void PrepareSystems(double target)

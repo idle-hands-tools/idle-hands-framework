@@ -1,6 +1,8 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
 using BreakInfinity;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Progression
 {
     public sealed class GrantResourceCommand : ISimulationCommand
     {

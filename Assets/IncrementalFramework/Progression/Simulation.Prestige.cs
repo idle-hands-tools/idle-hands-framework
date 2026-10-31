@@ -1,7 +1,9 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
 using System;
 using BreakInfinity;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Progression
 {
     public sealed partial class Simulation
     {

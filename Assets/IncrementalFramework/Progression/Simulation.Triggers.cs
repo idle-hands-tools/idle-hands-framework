@@ -1,7 +1,9 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
 using System;
 using System.Collections.Generic;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Progression
 {
     public sealed partial class Simulation
     {

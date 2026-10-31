@@ -1,8 +1,11 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using System;
 using System.Collections.Generic;
-using IncrementalFramework;
 
-namespace IdleHands.UnityIntegration
+namespace IncrementalFramework.Unity
 {
     public interface IPresentationAdapter
     {

@@ -1,6 +1,6 @@
 using System;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Core
 {
     public interface IClock
     {

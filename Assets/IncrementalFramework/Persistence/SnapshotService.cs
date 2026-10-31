@@ -1,3 +1,6 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -7,16 +10,17 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Persistence
 {
     public sealed class SimulationSnapshot
     {
-        public const int CurrentVersion = 3;
+        public const int CurrentVersion = 4;
         public int Version { get; set; } = CurrentVersion;
         public DateTime SavedAtUtc { get; set; }
         public string ContentVersion { get; set; }
         public string ContentHash { get; set; }
         public SimulationState State { get; set; }
+        public EntityWorldSnapshot Entities { get; set; }
         public List<SnapshotSectionData> Sections { get; set; } = new List<SnapshotSectionData>();
     }
 
@@ -55,7 +59,7 @@ namespace IncrementalFramework
     {
         private readonly string contentHash;
         public int FromVersion => 2;
-        public int ToVersion => 3;
+        public int ToVersion => SimulationSnapshot.CurrentVersion;
         public VersionTwoSnapshotMigration(ContentDatabase legacyContent)
         { contentHash = ContentFingerprint.Compute(legacyContent); }
         public JObject Migrate(JObject snapshot)
@@ -67,6 +71,7 @@ namespace IncrementalFramework
             snapshot["contentVersion"] = ContentFingerprint.CurrentVersion;
             snapshot["contentHash"] = contentHash;
             SnapshotService.AddLegacyLifetime(snapshot);
+            snapshot.Remove("entities");
             snapshot["version"] = ToVersion;
             return snapshot;
         }
@@ -77,7 +82,7 @@ namespace IncrementalFramework
         public const int MaximumSnapshotBytes = 16 * 1024 * 1024;
         internal static JsonSerializerSettings CreateSettings() => new JsonSerializerSettings
         {
-            ContractResolver = new CamelCasePropertyNamesContractResolver(),
+            ContractResolver = new EntityContractResolver(),
             Culture = CultureInfo.InvariantCulture,
             DateTimeZoneHandling = DateTimeZoneHandling.RoundtripKind,
             DateParseHandling = DateParseHandling.DateTime,
@@ -86,7 +91,7 @@ namespace IncrementalFramework
             MetadataPropertyHandling = MetadataPropertyHandling.Ignore,
             MissingMemberHandling = MissingMemberHandling.Error,
             MaxDepth = 64,
-            Converters = new List<JsonConverter> { new BigDoubleJsonConverter() }
+            Converters = new List<JsonConverter> { new BigDoubleJsonConverter(), new DefinitionConverter() }
         };
 
         public static SimulationSnapshot Capture(Simulation simulation) => Capture(simulation, SystemClock.Instance);
@@ -98,8 +103,8 @@ namespace IncrementalFramework
             RequireUtc(utcNow);
             var snapshot = new SimulationSnapshot
             {
-                SavedAtUtc = utcNow, State = simulation.ExportState(),
-                ContentVersion = ContentFingerprint.CurrentVersion, ContentHash = ContentFingerprint.Compute(simulation.Content)
+                SavedAtUtc = utcNow, State = simulation.ExportState(), Entities = EntitySnapshots.Capture(simulation.Entities),
+                ContentVersion = ContentFingerprint.CurrentVersion, ContentHash = ContentFingerprint.Compute(simulation.InitialContent)
             };
             foreach (var section in simulation.SnapshotSections)
             {
@@ -118,6 +123,8 @@ namespace IncrementalFramework
             var simulation = RestoreCore(content, snapshot, eventBudget);
             ValidateSections(modules?.SnapshotSections ?? Array.Empty<ISnapshotSection>(), snapshot.Sections);
             if (modules != null) modules.Attach(simulation);
+            if (snapshot.Entities != null) EntitySnapshots.Restore(simulation.Entities, snapshot.Entities);
+            simulation.AcceptRestoredEntities();
             RestoreSections(simulation, snapshot.Sections);
             return simulation;
         }
@@ -181,6 +188,12 @@ namespace IncrementalFramework
                     AddLegacyLifetime(root);
                     version = 3;
                 }
+                else if(version==3 && root["entities"]!=null)
+                {
+                    // A deliberately re-versioned current snapshot may be used by explicit migration tools.
+                    // Genuine pre-entity saves have no entity section and require an explicit migration.
+                    root.Remove("entities");version=SimulationSnapshot.CurrentVersion;
+                }
                 else throw new JsonSerializationException("No migration is available.");
                 root["version"] = version;
             }
@@ -241,6 +254,8 @@ namespace IncrementalFramework
                 ValidateSections(modules?.SnapshotSections ?? Array.Empty<ISnapshotSection>(), snapshot.Sections);
             }
             if (modules != null) modules.Attach(simulation);
+            if (snapshot.Entities != null) EntitySnapshots.Restore(simulation.Entities, snapshot.Entities);
+            simulation.AcceptRestoredEntities();
             RestoreSections(simulation, snapshot.Sections);
             AdvanceOffline(simulation, snapshot, utcNow, offlineCapSeconds);
             return simulation;
@@ -270,6 +285,12 @@ namespace IncrementalFramework
             ValidateCap(offlineCapSeconds);
             return AdvanceOffline(Restore(content, snapshot, eventBudget, modules), snapshot, now, offlineCapSeconds);
         }
+
+        /// <summary>Opt-in policy-based resume. Existing double-cap overloads retain their legacy behavior.</summary>
+        public static TimingRestoreResult Resume(ContentDatabase content, SimulationSnapshot snapshot, IClock clock,
+            IncrementalFramework.Progression.Timing.TimingOptions options, ModuleBuilder modules = null,
+            Func<Simulation, IncrementalFramework.Progression.Timing.ITimeline> timelineFactory = null, bool adoptLegacy = false) =>
+            TimingSnapshotService.Resume(content, snapshot, clock, options, modules, timelineFactory, adoptLegacy);
 
         private static void RestoreSections(Simulation simulation, IReadOnlyList<SnapshotSectionData> saved)
         {

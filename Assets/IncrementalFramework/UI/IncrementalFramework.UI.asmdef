@@ -1,0 +1,10 @@
+{
+  "name": "IncrementalFramework.UI",
+  "rootNamespace": "IncrementalFramework.UI",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Definitions",
+    "BreakInfinity"
+  ],
+  "noEngineReferences": true
+}

@@ -1,5 +1,6 @@
 {
   "name": "BreakInfinity",
   "rootNamespace": "BreakInfinity",
-  "noEngineReferences": true
+  "noEngineReferences": true,
+  "references": []
 }

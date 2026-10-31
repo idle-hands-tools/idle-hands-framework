@@ -1,0 +1,18 @@
+{
+  "name": "IncrementalFramework.Unity.Rpg",
+  "rootNamespace": "IncrementalFramework.Unity.Rpg",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Definitions",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "IncrementalFramework.Unity",
+    "IncrementalFramework.Games.Rpg",
+    "IncrementalFramework.Combat",
+    "UnityEngine.UI",
+    "BreakInfinity",
+    "IncrementalFramework.UI"
+  ],
+  "noEngineReferences": false,
+  "autoReferenced": true
+}

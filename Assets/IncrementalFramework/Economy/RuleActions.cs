@@ -1,11 +1,12 @@
+using IncrementalFramework.Core;
 using System;
 using BreakInfinity;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Economy
 {
     public enum RuleTriggerKind { Automatic, Time, Manual, ResourceThreshold, ProducerPurchased, UpgradePurchased, FlagChanged, Prestige, ResourceChanged, ScheduledEvent }
     public enum ScheduledEventTriggerKind { GrantResource = 1, BuyProducer, BuyUpgrade, ToggleProducer, Prestige, Click, SetFlag, SetModifier, TriggerRule }
-    public sealed class RuleTriggerDefinition
+    public sealed class RuleTriggerDefinition : IImmutableValue
     {
         public RuleTriggerKind Kind { get; }
         public string TargetId { get; }

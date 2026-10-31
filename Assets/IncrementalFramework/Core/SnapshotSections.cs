@@ -1,4 +1,4 @@
-namespace IncrementalFramework
+namespace IncrementalFramework.Core
 {
     /// <summary>Explicit, versioned module data; never deserialize arbitrary runtime types.</summary>
     public interface ISnapshotSection

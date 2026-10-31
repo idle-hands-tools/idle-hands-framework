@@ -8,4 +8,10 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/IncrementalFramework/Samples/CookieDemo/CookieDemo.unity
     guid: c1000000000000000000000000000001
+  - enabled: 1
+    path: Assets/IncrementalFramework/Samples/IdleRpg/IdleRpg.unity
+    guid: e9f78a409be343dfad689840b692eb85
+  - enabled: 1
+    path: Assets/IncrementalFramework/Samples/IdleStrategy/IdleStrategy.unity
+    guid: bf6d6018c1cf4aff84c13aa7e98ac9d5
   m_configObjects: {}

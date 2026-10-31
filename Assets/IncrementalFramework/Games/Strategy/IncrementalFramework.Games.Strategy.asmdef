@@ -1,0 +1,13 @@
+{
+  "name": "IncrementalFramework.Games.Strategy",
+  "rootNamespace": "IncrementalFramework.Games.Strategy",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Definitions",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "BreakInfinity"
+  ],
+  "noEngineReferences": true,
+  "autoReferenced": true
+}

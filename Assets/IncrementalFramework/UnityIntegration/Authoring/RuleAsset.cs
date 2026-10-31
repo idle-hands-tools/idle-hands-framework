@@ -1,17 +1,21 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using UnityEngine;
 
-namespace IdleHands.UnityIntegration
+namespace IncrementalFramework.Unity
 {
     [CreateAssetMenu(menuName = "Idle Hands/Unlock Rule")]
     public sealed class RuleAsset : ScriptableObject
     {
         public string id;
         public string displayName;
-        public IncrementalFramework.RuleTriggerKind triggerKind;
+        public IncrementalFramework.Economy.RuleTriggerKind triggerKind;
         [Tooltip("Optional resource/producer/upgrade/flag ID for the corresponding trigger; blank matches any.")]
         public string triggerTargetId;
         public bool filterScheduledEvent;
-        public IncrementalFramework.ScheduledEventTriggerKind scheduledEventKind = IncrementalFramework.ScheduledEventTriggerKind.GrantResource;
+        public IncrementalFramework.Economy.ScheduledEventTriggerKind scheduledEventKind = IncrementalFramework.Economy.ScheduledEventTriggerKind.GrantResource;
         [Tooltip("Absolute simulation time for Time triggers only.")]
         [Min(0)] public double triggerTime;
         [Tooltip("Optional primary resource threshold. Defaults to the click resource.")]

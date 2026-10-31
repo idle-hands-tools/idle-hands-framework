@@ -1,6 +1,10 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using UnityEngine;
 
-namespace IdleHands.UnityIntegration
+namespace IncrementalFramework.Unity
 {
     [CreateAssetMenu(menuName = "Idle Hands/Producer")]
     public sealed class ProducerAsset : ScriptableObject
@@ -17,7 +21,7 @@ namespace IdleHands.UnityIntegration
         public int rootConditionIndex = -1;
         [Tooltip("Override the game-wide producer reset setting.")]
         public bool usePrestigePolicy;
-        public IncrementalFramework.ResetPolicy prestigePolicy;
+        public IncrementalFramework.Core.ResetPolicy prestigePolicy;
         [Tooltip("Non-negative owned-count multiplier used only by Transform; fractional counts are floored.")]
         public string prestigeTransform = "1";
     }

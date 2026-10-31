@@ -1,0 +1,5 @@
+<linker>
+  <!-- Explicit snapshot/content DTOs are deserialized by Newtonsoft in IL2CPP players. -->
+  <assembly fullname="IncrementalFramework.Features" preserve="all" />
+  <assembly fullname="IncrementalFramework.Samples.Expanded" preserve="all" />
+</linker>

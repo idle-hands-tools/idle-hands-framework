@@ -11,5 +11,6 @@
     <Compile Include="../../Assets/IncrementalFramework/Persistence/**/*.cs" />
     <ProjectReference Include="../Progression/IncrementalFramework.Progression.csproj" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <ProjectReference Include="../Definitions/IncrementalFramework.Definitions.csproj" />
   </ItemGroup>
 </Project>

@@ -1,0 +1,6 @@
+{
+  "name": "IncrementalFramework.Tutorials",
+  "rootNamespace": "IncrementalFramework.Tutorials",
+  "references": ["IncrementalFramework.Core", "IncrementalFramework.Progression", "IncrementalFramework.UI"],
+  "noEngineReferences": true
+}

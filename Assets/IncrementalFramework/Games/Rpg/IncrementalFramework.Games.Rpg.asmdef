@@ -1,0 +1,19 @@
+{
+  "name": "IncrementalFramework.Games.Rpg",
+  "rootNamespace": "IncrementalFramework.Games.Rpg",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "IncrementalFramework.Persistence",
+    "BreakInfinity",
+    "IncrementalFramework.Combat",
+    "IncrementalFramework.Definitions"
+  ],
+  "overrideReferences": true,
+  "precompiledReferences": [
+    "Newtonsoft.Json.dll"
+  ],
+  "noEngineReferences": true,
+  "autoReferenced": true
+}

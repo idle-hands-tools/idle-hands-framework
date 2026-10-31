@@ -1,12 +1,15 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using BreakInfinity;
-using IncrementalFramework;
 
-namespace IdleHands.UnityIntegration
+namespace IncrementalFramework.Unity
 {
     public sealed class ContentValidationException : ArgumentException
     {
@@ -343,14 +346,14 @@ namespace IdleHands.UnityIntegration
                 + "invariant number (e.g. 1.25e30)."); }
         }
 
-        private static IncrementalFramework.ResourceAmount[] Amounts(ResourceAmount[] values)
+        private static IncrementalFramework.Economy.ResourceAmount[] Amounts(ResourceAmount[] values)
         {
-            return values.Select(x => new IncrementalFramework.ResourceAmount(x.resource.id, ReadNumber(x.amount))).ToArray();
+            return values.Select(x => new IncrementalFramework.Economy.ResourceAmount(x.resource.id, ReadNumber(x.amount))).ToArray();
         }
 
         private static RequirementDefinition[] Conditions(Requirement[] values)
         {
-            return values.Select(x => new RequirementDefinition((IncrementalFramework.RequirementKind)(int)x.kind,
+            return values.Select(x => new RequirementDefinition((IncrementalFramework.Economy.RequirementKind)(int)x.kind,
                 x.targetId, ReadNumber(x.amount))).ToArray();
         }
 
@@ -416,7 +419,7 @@ namespace IdleHands.UnityIntegration
         {
             var requirements = Conditions(rule.conditions).Select(ConditionDefinition.Require).ToList();
             if (rule.useResourceThreshold)
-                requirements.Insert(0, ConditionDefinition.Require(new RequirementDefinition(IncrementalFramework.RequirementKind.Resource,
+                requirements.Insert(0, ConditionDefinition.Require(new RequirementDefinition(IncrementalFramework.Economy.RequirementKind.Resource,
                     (rule.triggerResource != null ? rule.triggerResource : defaultResource).id, ReadNumber(rule.threshold))));
             if (rule.rootConditionIndex >= 0) requirements.Add(CompileBooleanNode(rule.booleanNodes, rule.rootConditionIndex));
             return ConditionDefinition.All(requirements.ToArray());
@@ -507,7 +510,7 @@ namespace IdleHands.UnityIntegration
             if (!exists) errors.Add(rule.name + ".triggerTargetId is unknown or unsupported for this trigger kind.");
         }
 
-        private static RuleAction CompileAction(RuleActionEntry entry)
+        internal static RuleAction CompileAction(RuleActionEntry entry)
         {
             switch (entry.kind)
             {

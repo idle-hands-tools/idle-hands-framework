@@ -1,4 +1,7 @@
-using IncrementalFramework;
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using NUnit.Framework;
 
 namespace IncrementalFrameworkTests

@@ -1,0 +1,15 @@
+{
+  "name": "IncrementalFramework.Samples.CookieDemo",
+  "rootNamespace": "IncrementalFramework.Samples.CookieDemo",
+  "references": [
+    "IncrementalFramework.Core",
+    "IncrementalFramework.Definitions",
+    "IncrementalFramework.Economy",
+    "IncrementalFramework.Progression",
+    "BreakInfinity",
+    "IncrementalFramework.Unity",
+    "IncrementalFramework.Games.Clicker",
+    "IncrementalFramework.Unity.Clicker"
+  ],
+  "autoReferenced": true
+}

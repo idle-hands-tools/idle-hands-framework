@@ -1,6 +1,10 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using UnityEngine;
 
-namespace IdleHands.UnityIntegration
+namespace IncrementalFramework.Unity
 {
     [CreateAssetMenu(menuName = "Idle Hands/Upgrade")]
     public sealed class UpgradeAsset : ScriptableObject

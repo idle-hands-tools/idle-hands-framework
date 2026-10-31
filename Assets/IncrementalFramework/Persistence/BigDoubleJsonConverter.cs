@@ -1,9 +1,12 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
 using System;
 using BreakInfinity;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Persistence
 {
     /// <summary>Never converts a BigDouble through a double-sized magnitude or a formatted decimal string.</summary>
     public sealed class BigDoubleJsonConverter : JsonConverter<BigDouble>

@@ -1,7 +1,10 @@
+using IncrementalFramework.Core;
+using IncrementalFramework.Economy;
+using IncrementalFramework.Progression;
+using IncrementalFramework.Persistence;
 using System;
 using System.Collections.Generic;
-using IdleHands.UnityIntegration;
-using IncrementalFramework;
+using IncrementalFramework.Unity;
 using NUnit.Framework;
 
 namespace IdleHands.Tests

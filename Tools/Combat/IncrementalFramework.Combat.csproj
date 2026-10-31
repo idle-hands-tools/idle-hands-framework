@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <AssemblyName>IncrementalFramework.Combat</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Core/IncrementalFramework.Core.csproj" />
+    <ProjectReference Include="../Definitions/IncrementalFramework.Definitions.csproj" />
+    <Compile Include="../../Assets/IncrementalFramework/Combat/**/*.cs" />
+  </ItemGroup>
+</Project>

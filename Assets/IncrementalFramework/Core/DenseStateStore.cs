@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace IncrementalFramework
+namespace IncrementalFramework.Core
 {
     public interface IReadOnlyStateStore<T> where T : struct
     {
